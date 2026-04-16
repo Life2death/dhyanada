@@ -99,3 +99,37 @@ Out of scope Phase 1: voice input, image diagnosis, weather alerts, buyer matchi
 9. Marathi templates + transliteration
 10. Admin dashboard
 11. DPDPA consent flow + audit log hardening
+
+## Git workflow — MANDATORY after every module
+
+After completing Step 8 (commit) of any module, you MUST also push to GitHub and verify the push. Do not consider a module complete until all of the following succeed:
+
+### After every integration:
+1. `git add <files>` — stage only the files relevant to this module
+2. `git commit -m "feat(<module>): <description>"` — conventional commit format
+3. `git push origin main`
+4. Verify by running `git log origin/main --oneline -3` and showing me the actual output. If the latest commit isn't there, the push failed — do not claim success.
+5. Show me the full output of step 4 in your reply. Do not summarize.
+
+### After any documentation or config change:
+Same sequence. Every file change ends with a pushed commit.
+
+### Never claim success without verification
+- If `git push` returns an error, stop and show me the error. Do not retry silently.
+- If `git log origin/main` doesn't show the commit you just made, the push didn't work. Investigate and show me the state.
+- Never fabricate commit hashes or command output. If a command fails, report the real failure.
+
+### Commit message format
+- Scaffolding / config: `chore: <what>`
+- New module integration: `feat(<module>): integrate <library> v<version>`
+- Bug fixes: `fix(<module>): <what>`
+- Documentation: `docs(<area>): <what>`
+
+### Branch policy
+- All work goes to `main` directly for Phase 1 (solo dev, no PR overhead).
+- Phase 2 onwards: feature branches + PRs.
+
+### Frequency
+- Commit after every meaningful unit of work, not just at the end of a module.
+- Good checkpoints: after Step 6 (integration), after Step 7 (passing test), after Step 8 (module complete).
+- Three commits per module is normal. One huge commit per module is not.
