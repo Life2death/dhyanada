@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
@@ -246,5 +246,372 @@ async def _ingest_weather_async():
     except Exception as exc:
         logger.exception("ingest_weather: failed")
         raise
+    finally:
+        await engine.dispose()
+
+
+@app.task(bind=True, max_retries=3)
+def ingest_prices(self):
+    """
+    Daily price ingestion: fetch from 4 sources (Agmarknet, MSIB, NHRDF, Vashi).
+    Runs at 8:00 PM IST (before evening alert trigger at 8:30 PM).
+
+    Phase 2 Module 5: Price Alerts
+    """
+    import asyncio
+    return asyncio.run(_ingest_prices_async())
+
+
+async def _ingest_prices_async():
+    """Actual price ingestion logic (async)."""
+    logger.info("ingest_prices: starting")
+
+    try:
+        from src.ingestion.orchestrator import run_ingestion
+
+        # Setup DB connection
+        engine = create_async_engine(settings.database_url)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with async_session() as session:
+            trade_date = date.today()
+
+            # Run multi-source price ingestion
+            summary = await run_ingestion(trade_date, session)
+
+            logger.info(
+                "ingest_prices: complete for %s — total=%d, winners=%d, persisted=%d, healthy=%s",
+                trade_date,
+                summary.total_records,
+                summary.winner_count,
+                summary.persisted,
+                summary.healthy(),
+            )
+
+            return {
+                "date": trade_date.isoformat(),
+                "total": summary.total_records,
+                "persisted": summary.persisted,
+                "healthy": summary.healthy(),
+                "per_source": summary.per_source_counts,
+                "errors": summary.errors,
+            }
+
+    except Exception as exc:
+        logger.exception("ingest_prices: failed")
+        raise
+    finally:
+        await engine.dispose()
+
+
+@app.task(bind=True, max_retries=3)
+def trigger_price_alerts(self):
+    """
+    Check active price alert subscriptions against just-ingested mandi prices.
+    Send WhatsApp notifications for triggered alerts.
+
+    Runs at 8:30 PM IST (after ingest_prices completes at 8:00 PM).
+
+    Phase 2 Module 5: Price Alerts
+    """
+    import asyncio
+    return asyncio.run(_trigger_price_alerts_async())
+
+
+async def _trigger_price_alerts_async():
+    """Check and trigger price alerts."""
+    logger.info("trigger_price_alerts: starting")
+
+    # Setup DB connection
+    engine = create_async_engine(settings.database_url)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    try:
+        async with async_session() as session:
+            from src.price.alert_repository import PriceAlertRepository
+            from src.price.alert_formatter import format_price_alert_triggered
+            from src.price.repository import PriceRepository
+
+            alert_repo = PriceAlertRepository(session)
+            price_repo = PriceRepository(session)
+            whatsapp = WhatsAppAdapter()
+
+            # Get all active price alerts
+            active_alerts = await alert_repo.get_active_alerts()
+            logger.info("trigger_price_alerts: found %d active alerts", len(active_alerts))
+
+            triggered_count = 0
+            error_count = 0
+
+            for alert in active_alerts:
+                try:
+                    farmer_id = alert["farmer_id"]
+                    commodity = alert["commodity"]
+                    condition = alert["condition"]
+                    threshold = alert["threshold"]
+                    district = alert["district"]
+
+                    # Get latest price for this commodity/district
+                    from src.price.models import PriceQuery
+                    query = PriceQuery(commodity=commodity, district=district)
+                    price_result = await price_repo.query(query)
+
+                    if not price_result.found:
+                        logger.debug(
+                            "trigger_price_alerts: no price data for %s/%s",
+                            commodity, district or "all",
+                        )
+                        continue
+
+                    current_price = price_result.modal_price
+                    if current_price is None:
+                        continue
+
+                    # Check if condition is met
+                    if alert_repo.check_condition(condition, float(current_price), threshold):
+                        # Get farmer language preference
+                        farmer_stmt = select(Farmer).where(Farmer.id == farmer_id)
+                        farmer_result = await session.execute(farmer_stmt)
+                        farmer = farmer_result.scalar_one_or_none()
+
+                        if not farmer:
+                            logger.warning("trigger_price_alerts: farmer %s not found", farmer_id)
+                            continue
+
+                        # Format and send notification
+                        lang = farmer.preferred_language or "mr"
+                        msg_text = format_price_alert_triggered(
+                            commodity=commodity,
+                            condition=condition,
+                            current_price=float(current_price),
+                            threshold=threshold,
+                            district=district or "all",
+                            lang=lang,
+                        )
+
+                        success = await whatsapp.send_text_message(
+                            phone=farmer.phone,
+                            text=msg_text,
+                        )
+
+                        if success:
+                            triggered_count += 1
+                            logger.info(
+                                "trigger_price_alerts: sent to farmer=%s commodity=%s",
+                                farmer.phone, commodity,
+                            )
+                        else:
+                            error_count += 1
+
+                except Exception as exc:
+                    logger.error(
+                        "trigger_price_alerts: error processing alert: %s",
+                        exc,
+                    )
+                    error_count += 1
+
+            logger.info(
+                "trigger_price_alerts: complete triggered=%d errors=%d",
+                triggered_count, error_count,
+            )
+            return {"triggered": triggered_count, "errors": error_count}
+
+    finally:
+        await engine.dispose()
+
+
+@app.task(bind=True, max_retries=3)
+def ingest_government_schemes(self):
+    """
+    Daily government schemes ingestion: fetch from PMKSY, PM-FASAL, Rashtriya Kranti.
+    Runs at 6:15 AM IST (after weather at 6:00 AM, before price broadcast at 6:30 AM).
+
+    Phase 2 Module 4: Government Schemes & MSP Alerts
+    """
+    import asyncio
+    return asyncio.run(_ingest_government_schemes_async())
+
+
+async def _ingest_government_schemes_async():
+    """Actual government schemes ingestion logic (async)."""
+    logger.info("ingest_government_schemes: starting")
+
+    try:
+        from src.ingestion.schemes.orchestrator import SchemeOrchestrator
+
+        # Setup DB connection
+        engine = create_async_engine(settings.database_url)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with async_session() as session:
+            # Create orchestrator with config
+            config = {
+                "pmksy_api_enabled": settings.pmksy_api_enabled,
+                "pmfby_api_enabled": settings.pmfby_api_enabled,
+            }
+            orchestrator = SchemeOrchestrator(session, config)
+
+            # Run ingestion
+            summary = await orchestrator.ingest()
+
+            logger.info(
+                "ingest_government_schemes: complete — fetched=%d, upserted=%d, healthy=%s, errors=%d",
+                summary.total_records_fetched,
+                summary.total_records_upserted,
+                summary.is_healthy,
+                len(summary.errors),
+            )
+
+            return {
+                "fetched": summary.total_records_fetched,
+                "upserted": summary.total_records_upserted,
+                "healthy": summary.is_healthy,
+                "sources_succeeded": summary.sources_succeeded,
+                "sources_failed": summary.sources_failed,
+                "errors": summary.errors,
+            }
+
+    except Exception as exc:
+        logger.exception("ingest_government_schemes: failed")
+        raise
+    finally:
+        await engine.dispose()
+
+
+@app.task(bind=True, max_retries=3)
+def trigger_msp_alerts(self):
+    """
+    Check active MSP alert subscriptions against just-ingested scheme MSP data.
+    Send WhatsApp notifications for triggered alerts.
+
+    Runs at 6:20 AM IST (after ingest_government_schemes completes at 6:15 AM).
+
+    Phase 2 Module 4: Government Schemes & MSP Alerts
+    """
+    import asyncio
+    return asyncio.run(_trigger_msp_alerts_async())
+
+
+async def _trigger_msp_alerts_async():
+    """Check and trigger MSP alerts."""
+    logger.info("trigger_msp_alerts: starting")
+
+    # Setup DB connection
+    engine = create_async_engine(settings.database_url)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    try:
+        async with async_session() as session:
+            from src.scheme.formatter import format_msp_alert_triggered
+            from src.models.schemes import MSPAlert, GovernmentScheme
+
+            whatsapp = WhatsAppAdapter()
+
+            # Get all active MSP alerts
+            stmt = select(MSPAlert).where(MSPAlert.is_active == True)
+            result = await session.execute(stmt)
+            msp_alerts = result.scalars().all()
+
+            logger.info("trigger_msp_alerts: found %d active MSP alerts", len(msp_alerts))
+
+            triggered_count = 0
+            error_count = 0
+
+            # Group alerts by commodity for efficient lookup
+            alerts_by_commodity = {}
+            for alert in msp_alerts:
+                commodity = alert.commodity
+                if commodity not in alerts_by_commodity:
+                    alerts_by_commodity[commodity] = []
+                alerts_by_commodity[commodity].append(alert)
+
+            # For each commodity with alerts, get latest MSP from schemes
+            for commodity, commodity_alerts in alerts_by_commodity.items():
+                try:
+                    # Query latest scheme that includes this commodity
+                    stmt = (
+                        select(GovernmentScheme)
+                        .where(GovernmentScheme.commodities.contains([commodity]))
+                        .order_by(GovernmentScheme.created_at.desc())
+                        .limit(1)
+                    )
+                    result = await session.execute(stmt)
+                    scheme = result.scalar_one_or_none()
+
+                    if not scheme:
+                        logger.debug("trigger_msp_alerts: no scheme data for %s", commodity)
+                        continue
+
+                    # Extract MSP from benefit_amount or eligibility_criteria
+                    msp_value = None
+                    if scheme.benefit_amount:
+                        msp_value = float(scheme.benefit_amount)
+                    elif scheme.eligibility_criteria and isinstance(scheme.eligibility_criteria, dict):
+                        msp_value = scheme.eligibility_criteria.get("msp_value")
+
+                    if msp_value is None:
+                        logger.debug("trigger_msp_alerts: no MSP value in scheme for %s", commodity)
+                        continue
+
+                    # Check each alert for this commodity
+                    for alert in commodity_alerts:
+                        try:
+                            # For MSP alerts, trigger when MSP >= threshold (condition always ">")
+                            if msp_value >= float(alert.alert_threshold):
+                                # Get farmer for language preference
+                                farmer_stmt = select(Farmer).where(Farmer.id == alert.farmer_id)
+                                farmer_result = await session.execute(farmer_stmt)
+                                farmer = farmer_result.scalar_one_or_none()
+
+                                if not farmer:
+                                    logger.warning("trigger_msp_alerts: farmer %s not found", alert.farmer_id)
+                                    continue
+
+                                # Format and send notification
+                                lang = farmer.preferred_language or "mr"
+                                msg_text = format_msp_alert_triggered(
+                                    commodity=commodity,
+                                    msp_price=msp_value,
+                                    threshold=float(alert.alert_threshold),
+                                    lang=lang,
+                                )
+
+                                success = await whatsapp.send_text_message(
+                                    phone=farmer.phone,
+                                    text=msg_text,
+                                )
+
+                                if success:
+                                    # Update triggered_at to avoid duplicate sends
+                                    alert.triggered_at = datetime.now(timezone.utc)
+                                    await session.commit()
+
+                                    triggered_count += 1
+                                    logger.info(
+                                        "trigger_msp_alerts: sent to farmer=%s commodity=%s msp=%.0f",
+                                        farmer.phone, commodity, msp_value,
+                                    )
+                                else:
+                                    error_count += 1
+
+                        except Exception as exc:
+                            logger.error(
+                                "trigger_msp_alerts: error processing alert for farmer %s: %s",
+                                alert.farmer_id, exc,
+                            )
+                            error_count += 1
+
+                except Exception as exc:
+                    logger.error(
+                        "trigger_msp_alerts: error processing commodity=%s: %s",
+                        commodity, exc,
+                    )
+
+            logger.info(
+                "trigger_msp_alerts: complete triggered=%d errors=%d",
+                triggered_count, error_count,
+            )
+            return {"triggered": triggered_count, "errors": error_count}
+
     finally:
         await engine.dispose()

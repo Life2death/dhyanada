@@ -22,10 +22,34 @@ app.conf.beat_schedule = {
         # 6:00 AM IST every day (Phase 2 Module 1)
         "schedule": crontab(hour=6, minute=0),
     },
+    "ingest-government-schemes-daily": {
+        "task": "src.scheduler.tasks.ingest_government_schemes",
+        # 6:15 AM IST every day (after weather at 6:00 AM)
+        # Phase 2 Module 4
+        "schedule": crontab(hour=6, minute=15),
+    },
+    "trigger-msp-alerts-daily": {
+        "task": "src.scheduler.tasks.trigger_msp_alerts",
+        # 6:20 AM IST every day (after scheme ingestion at 6:15 AM)
+        # Phase 2 Module 4
+        "schedule": crontab(hour=6, minute=20),
+    },
     "broadcast-prices-daily": {
         "task": "src.scheduler.tasks.broadcast_prices",
         # 6:30 AM IST every day (runs 30 min after weather ingestion)
         "schedule": crontab(hour=6, minute=30),
+    },
+    "ingest-prices-daily": {
+        "task": "src.scheduler.tasks.ingest_prices",
+        # 8:00 PM IST every day (evening price ingestion)
+        # Phase 2 Module 5
+        "schedule": crontab(hour=20, minute=0),
+    },
+    "trigger-price-alerts-daily": {
+        "task": "src.scheduler.tasks.trigger_price_alerts",
+        # 8:30 PM IST every day (after price ingestion at 8:00 PM)
+        # Phase 2 Module 5
+        "schedule": crontab(hour=20, minute=30),
     },
     "hard-delete-erased-farmers": {
         "task": "src.scheduler.tasks.hard_delete_erased_farmers",
