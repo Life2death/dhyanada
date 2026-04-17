@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     voice_transcription_timeout: int = 30  # Max seconds per transcription request
     openai_api_key: str = ""  # OpenAI API key (for Whisper fallback)
 
+    # Pest Diagnosis (Phase 2 Module 3)
+    tensorflow_model_path: str = "models/crop_disease_classifier.h5"  # Path to TensorFlow model
+    gemini_vision_enabled: bool = True  # Enable Gemini Vision fallback
+    image_processing_timeout: int = 60  # Max seconds for image diagnosis
+    diagnosis_confidence_threshold: float = 0.7  # Min confidence to report diagnosis
+
+    # Government Schemes & MSP Alerts (Phase 2 Module 4)
+    pmksy_api_enabled: bool = True  # PM-KISAN API enabled
+    pmfby_api_enabled: bool = True  # PM-FASAL Bima Yojana API enabled
+    scheme_ingestion_timeout: int = 30  # Max seconds per scheme source
+    msp_alert_enabled: bool = True  # MSP alert feature enabled
+
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
