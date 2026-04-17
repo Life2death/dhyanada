@@ -214,10 +214,123 @@ async def receive_message(request: Request):
                         await whatsapp.send_text_message(msg.from_phone, reply)
                         logger.info(f"✅ Sent diagnosis reply to {msg.from_phone}")
 
-                    # Other intents (PRICE_QUERY, SUBSCRIBE, ONBOARDING, etc.)
-                    # TODO: Add handlers for these intents
+                    # Price query
+                    elif intent_type == Intent.PRICE_QUERY:
+                        from src.price.repository import PriceRepository
+                        from src.price.formatter import format_price_reply
+                        from src.price.models import PriceQuery
+
+                        price_repo = PriceRepository(session)
+                        # TODO: lookup farmer profile for district and language
+                        query = PriceQuery(
+                            commodity=result.get("commodity", ""),
+                            district=result.get("district"),
+                        )
+                        price_result = await price_repo.query(query)
+                        reply = format_price_reply(price_result, lang="mr")
+                        if reply:
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Sent price reply to {msg.from_phone}")
+
+                    # Price alert subscription
+                    elif intent_type == Intent.PRICE_ALERT:
+                        from src.price.alert_handler import PriceAlertHandler
+
+                        alert_handler = PriceAlertHandler(session)
+                        # TODO: lookup farmer_id and language from farmer profile
+                        reply = await alert_handler.handle_subscription(
+                            farmer_id="placeholder_id",  # TODO: actual farmer_id from lookup
+                            commodity=result.get("commodity", ""),
+                            threshold=0.0,  # TODO: extract from message
+                            condition=">",
+                            district=result.get("district"),
+                            farmer_language="mr",
+                        )
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent price alert confirmation to {msg.from_phone}")
+
+                    # Government scheme query
+                    elif intent_type == Intent.SCHEME_QUERY:
+                        from src.scheme.handler import SchemeHandler
+
+                        scheme_handler = SchemeHandler(session)
+                        # TODO: lookup farmer profile for age, land, crops, district, language
+                        reply = await scheme_handler.handle_scheme_query(
+                            farmer_age=18,  # TODO: from farmer profile
+                            farmer_land_hectares=2.0,
+                            farmer_crops=["wheat", "cotton"],
+                            farmer_district="pune",  # TODO: from farmer profile
+                            farmer_language="mr",
+                        )
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent scheme eligibility to {msg.from_phone}")
+
+                    # MSP alert subscription
+                    elif intent_type == Intent.MSP_ALERT:
+                        from src.scheme.handler import SchemeHandler
+
+                        scheme_handler = SchemeHandler(session)
+                        # TODO: lookup farmer_id, language from farmer profile
+                        reply = await scheme_handler.handle_msp_alert(
+                            farmer_id="placeholder_id",  # TODO: actual farmer_id
+                            commodity=result.get("commodity", ""),
+                            alert_threshold=0.0,  # TODO: extract from message
+                            farmer_language="mr",
+                        )
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent MSP alert confirmation to {msg.from_phone}")
+
+                    # Subscribe to daily broadcast
+                    elif intent_type == Intent.SUBSCRIBE:
+                        # TODO: update farmer subscription_status to 'active'
+                        reply = "✅ आपले दैनिक किंमत सूचना सक्षम केली.\n\nहे आपल्याला दररोज सकाळी 6:30 वाजता येईल."
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Subscribed farmer {msg.from_phone}")
+
+                    # Unsubscribe from broadcast
+                    elif intent_type == Intent.UNSUBSCRIBE:
+                        # TODO: update farmer subscription_status to 'inactive'
+                        reply = "❌ आपले दैनिक सूचना बंद केली."
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Unsubscribed farmer {msg.from_phone}")
+
+                    # Onboarding / help / greeting / feedback
+                    elif intent_type == Intent.ONBOARDING:
+                        from src.handlers.onboarding import handle
+                        # Start onboarding state machine with empty input (will return first message)
+                        reply = await handle(msg.from_phone, "")
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent onboarding to {msg.from_phone}")
+
+                    elif intent_type == Intent.HELP:
+                        help_msg = (
+                            "📋 **उपलब्ध आदेश**:\n\n"
+                            "1️⃣ कांद्याचा भाव - आजचा किंमत जाणून घ्या\n"
+                            "2️⃣ योजना - सरकारी योजनांसाठी पात्रता तपासा\n"
+                            "3️⃣ अलर्ट सेट करा - किंमत पोहोचल्यावर सूचना घ्या\n"
+                            "4️⃣ हवामान - आजचे हवामान जाणून घ्या\n"
+                            "5️⃣ शुरू / बंद - दैनिक सूचना सक्षम/निष्क्रिय करा\n\n"
+                            "अधिक मदतीसाठी, कृपया 'मदत' लिहा."
+                        )
+                        await whatsapp.send_text_message(msg.from_phone, help_msg)
+                        logger.info(f"✅ Sent help menu to {msg.from_phone}")
+
+                    elif intent_type == Intent.GREETING:
+                        reply = "नमस्ते! 👋 कृपया मला काय करायचे आहे हे सांगा:\n\n• कांद्याचा भाव?\n• योजना?\n• अलर्ट सेट करा?"
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent greeting to {msg.from_phone}")
+
+                    elif intent_type == Intent.FEEDBACK:
+                        # TODO: Log feedback to database
+                        reply = "धन्यवाद आपल्या प्रतिक्रियेसाठी! 🙏 आम्ही त्यावर विचार करू."
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Logged feedback from {msg.from_phone}")
+
                     else:
-                        logger.info(f"ℹ️  Intent {intent_type.value} not yet routed (stub)")
+                        # Unknown intent
+                        reply = "माफ करा, मला समजले नाही. कृपया पुनः प्रयत्न करा किंवा 'मदत' लिहा."
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"ℹ️  Unknown intent {intent_type.value} from {msg.from_phone}")
 
             except Exception as e:
                 logger.error(f"❌ Error processing message from {msg.from_phone}: {e}", exc_info=True)
