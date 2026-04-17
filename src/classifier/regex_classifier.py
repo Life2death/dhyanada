@@ -109,6 +109,60 @@ _WEATHER_RE = _p(
     r"\baaj\s+ka\s+mausam\b", r"\bgarmi\b", r"\bthandi\b",
 )
 
+# ── Price alert triggers (Phase 2 Module 5) ──────────────────────────────────
+_PRICE_ALERT_RE = _p(
+    # English
+    r"\balert\b", r"\bnotif(ication)?\b", r"\bwhen\s+(price|rate)\b",
+    r"\bnotify\s+me\b", r"\btell\s+me\s+(if|when)\b",
+    r"\bset\s+(alert|alarm|notification)\b", r"\bset\s+price\b",
+    # Marathi Devanagari
+    r"सूचित\s*कर", r"सूचना", r"जेव्हा", r"अलर्ट",
+    r"किंमत\s*बदल", r"अलर्ट\s*लाग",
+    # Hinglish
+    r"\balert\s*do\b", r"\bnotify\s+karo\b", r"\bjab\s+(price|bhav)\b",
+)
+
+# ── Government scheme query triggers (Phase 2 Module 4) ────────────────────
+_SCHEME_QUERY_RE = _p(
+    # English
+    r"\bscheme\b", r"\beligible\b", r"\beligibility\b", r"\bsubsidy\b",
+    r"\bgrant\b", r"\baid\b", r"\bpmkisan\b", r"\bfasal\b",
+    r"\bgovernment\s+(scheme|support|aid)\b", r"\bwhat\s+schemes?\b",
+    r"\bwhat\s+(can\s+)?i\s+(get|avail)\b",
+    # Marathi Devanagari
+    r"योजना", r"अर्ह", r"अर्हता", r"सहायता", r"अनुदान",
+    r"पीएम\s*किसान", r"केंद्र\s*सरकार", r"राज्य\s*सरकार",
+    r"सरकारी\s*योजना", r"कोणती\s*योजना",
+    # Hinglish
+    r"\byojana\b", r"\bkaunsi\s+yojana\b", r"\bkisaan\s+yojana\b",
+)
+
+# ── Pest/Disease diagnosis triggers (Phase 2 Module 3) ──────────────────────
+_PEST_QUERY_RE = _p(
+    # English
+    r"\bpest\b", r"\bdisease\b", r"\bbug\b", r"\binfestation\b",
+    r"\bwhat.?s\s+(wrong|wrong)\b", r"\bmy\s+(plant|crop)\s+(is\s+)?sick\b",
+    r"\bdiagnose\b", r"\bwhat.?s\s+this\b", r"\bidentify\b",
+    r"\bwhite\s+spots?\b", r"\byellow\s+leaves?\b", r"\bdark\s+spots?\b",
+    # Marathi Devanagari
+    r"कीट", r"रोग", r"संक्रमण", r"बोंड", r"झाल\w*\s+आहे",
+    r"काय\s+समस्या", r"पाहून\s*द्या", r"दिसून\s*द्या",
+    # Hinglish
+    r"\bpest\b", r"\bkeeta\b", r"\brog\b", r"\binfection\b",
+)
+
+# ── MSP alert triggers (Phase 2 Module 4 — minimum support price alerts) ────
+_MSP_ALERT_RE = _p(
+    # English
+    r"\bmsp\b", r"\bminimum\s+support\s+price\b", r"\bsupport\s+price\b",
+    r"\bwhen\s+msp\b", r"\bset\s+msp\b", r"\bmsp\s+alert\b",
+    # Marathi Devanagari
+    r"न्यूनतम\s*समर्थन\s*मूल्य", r"न्यूनतम\s*मूल्य", r"समर्थन\s*मूल्य",
+    r"एमएसपी", r"एमएसपी\s*अलर्ट",
+    # Hinglish
+    r"\bmsp\b", r"\bminimum\s+price\b",
+)
+
 # ── Weather metric extraction (Phase 2) ────────────────────────────────────
 _WEATHER_METRIC_PATTERNS: list[tuple[re.Pattern, str]] = [
     (_p(r"\btemp\b", r"\btemperature\b", r"\bgarmi\b", r"तापमान"), "temperature"),
@@ -190,6 +244,42 @@ def classify_regex(text: str) -> IntentResult:
             explanation="subscribe_pattern",
         )
 
+    # Price alert (set alert for price condition)
+    if _PRICE_ALERT_RE.search(t):
+        commodity = _extract_commodity(t)
+        district = _extract_district(t)
+        return IntentResult(
+            intent=Intent.PRICE_ALERT,
+            confidence=1.0,
+            commodity=commodity,
+            district=district,
+            source="regex",
+            raw_text=text,
+            explanation="price_alert_pattern",
+        )
+
+    # MSP alert (minimum support price alert)
+    if _MSP_ALERT_RE.search(t):
+        commodity = _extract_commodity(t)
+        return IntentResult(
+            intent=Intent.MSP_ALERT,
+            confidence=1.0,
+            commodity=commodity,
+            source="regex",
+            raw_text=text,
+            explanation="msp_alert_pattern",
+        )
+
+    # Government scheme query
+    if _SCHEME_QUERY_RE.search(t):
+        return IntentResult(
+            intent=Intent.SCHEME_QUERY,
+            confidence=1.0,
+            source="regex",
+            raw_text=text,
+            explanation="scheme_query_pattern",
+        )
+
     # Price query
     if _PRICE_RE.search(t):
         commodity = _extract_commodity(t)
@@ -202,6 +292,16 @@ def classify_regex(text: str) -> IntentResult:
             source="regex",
             raw_text=text,
             explanation="price_pattern",
+        )
+
+    # Pest/disease diagnosis
+    if _PEST_QUERY_RE.search(t):
+        return IntentResult(
+            intent=Intent.PEST_QUERY,
+            confidence=1.0,
+            source="regex",
+            raw_text=text,
+            explanation="pest_query_pattern",
         )
 
     if _ONBOARDING_RE.search(t):
