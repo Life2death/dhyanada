@@ -3,8 +3,8 @@ fastapi==0.115.5
 uvicorn[standard]==0.32.1
 python-multipart==0.0.20
 
-# WhatsApp
-pywa==2.5.0
+# WhatsApp Cloud API
+pywa==4.0.0
 
 # Database
 sqlalchemy==2.0.36

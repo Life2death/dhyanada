@@ -1,70 +1,68 @@
-"""Thin adapter wrapping pywa. Business logic must never import pywa directly."""
+"""WhatsApp Cloud API Adapter using PyWa v4.0.0"""
+
 import logging
-from typing import Callable, Awaitable
-
-from fastapi import FastAPI
-from pywa import WhatsApp
-from pywa.types import Message, CallbackButton, CallbackSelection
-
-from src.config import settings
+from typing import Optional, List
+from dataclasses import dataclass
+from pywa import WhatsApp, types
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class WhatsAppConfig:
+    """WhatsApp client configuration"""
+    phone_id: str
+    token: str
+    business_account_id: Optional[str] = None
+    app_id: Optional[str] = None
+    app_secret: Optional[str] = None
+
+
 class WhatsAppAdapter:
-    """Wraps pywa.WhatsApp; provides send/receive methods used by handlers."""
+    """Thin wrapper around PyWa for Kisan AI bot"""
 
-    def __init__(self) -> None:
-        self._client: WhatsApp | None = None
+    def __init__(self, config: WhatsAppConfig):
+        self.config = config
+        self.client: Optional[WhatsApp] = None
+        self._initialize_client()
 
-    @property
-    def is_ready(self) -> bool:
-        return self._client is not None
+    def _initialize_client(self) -> None:
+        """Initialize PyWa client"""
+        try:
+            kwargs = {"phone_id": self.config.phone_id, "token": self.config.token}
+            if self.config.business_account_id:
+                kwargs["business_account_id"] = self.config.business_account_id
+            self.client = WhatsApp(**kwargs)
+            logger.info("WhatsApp adapter initialized")
+        except Exception as e:
+            logger.error(f"Failed to init WhatsApp: {e}")
+            raise
 
-    async def start(self, app: FastAPI) -> None:
-        """Bind pywa to the FastAPI app and register handlers."""
-        self._client = WhatsApp(
-            phone_id=settings.whatsapp_phone_id,
-            token=settings.whatsapp_token,
-            server=app,
-            verify_token=settings.whatsapp_verify_token,
-            app_id=int(settings.whatsapp_app_id) if settings.whatsapp_app_id else None,
-            app_secret=settings.whatsapp_app_secret,
-        )
-        logger.info("WhatsApp adapter initialised (phone_id=%s)", settings.whatsapp_phone_id)
+    async def send_text_message(self, to: str, text: str) -> Optional[str]:
+        """Send text message (supports Marathi)"""
+        try:
+            if not self.client:
+                return None
+            msg_id = await self.client.send_message(to=to, text=text)
+            logger.info(f"Message sent to {to}")
+            return msg_id
+        except Exception as e:
+            logger.error(f"Send failed: {e}")
+            raise
 
-    # ------------------------------------------------------------------
-    # Outbound helpers
-    # ------------------------------------------------------------------
-
-    async def send_text(self, to: str, text: str) -> str:
-        """Send a plain text message. Returns the WhatsApp message ID."""
-        if not self._client:
-            raise RuntimeError("WhatsApp adapter not started")
-        return self._client.send_message(to=to, text=text)
-
-    async def send_template(self, to: str, template_name: str, **kwargs) -> str:
-        """Send a pre-approved WhatsApp template message."""
-        if not self._client:
-            raise RuntimeError("WhatsApp adapter not started")
-        return self._client.send_template(to=to, template=template_name, **kwargs)
-
-    # ------------------------------------------------------------------
-    # Handler registration
-    # ------------------------------------------------------------------
-
-    def on_message(self, handler: Callable[[Message], Awaitable[None]]) -> None:
-        """Register an async callback for inbound text messages."""
-        if not self._client:
-            raise RuntimeError("WhatsApp adapter not started")
-        self._client.on_message(handler)
-
-    def on_button(self, handler: Callable[[CallbackButton], Awaitable[None]]) -> None:
-        """Register an async callback for button-click events."""
-        if not self._client:
-            raise RuntimeError("WhatsApp adapter not started")
-        self._client.on_callback_button(handler)
+    def is_connected(self) -> bool:
+        return self.client is not None
 
 
-# Module-level singleton — import this everywhere
-wa_adapter = WhatsAppAdapter()
+_adapter_instance: Optional[WhatsAppAdapter] = None
+
+
+def init_adapter(config: WhatsAppConfig) -> WhatsAppAdapter:
+    global _adapter_instance
+    _adapter_instance = WhatsAppAdapter(config)
+    return _adapter_instance
+
+
+def get_adapter() -> Optional[WhatsAppAdapter]:
+    return _adapter_instance
+
