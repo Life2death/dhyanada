@@ -1,341 +1,156 @@
-"""Tests for onboarding state machine — full Marathi flow with Redis mocked."""
-import json
-from unittest.mock import AsyncMock, MagicMock, patch
+"""Tests for Module 6 — onboarding state machine."""
+from __future__ import annotations
 
+from unittest.mock import AsyncMock
 import pytest
 
-from src.handlers.onboarding import (
-    OnboardingSession,
-    handle,
-    load_session,
-    save_session,
-)
-
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-def _make_redis_mock(stored: dict | None = None):
-    """Return a mock Redis async context manager with optional pre-loaded key."""
-    redis_mock = AsyncMock()
-    redis_mock.get = AsyncMock(return_value=json.dumps(stored) if stored else None)
-    redis_mock.setex = AsyncMock()
-    redis_mock.delete = AsyncMock()
-
-    cm = MagicMock()
-    cm.__aenter__ = AsyncMock(return_value=redis_mock)
-    cm.__aexit__ = AsyncMock(return_value=False)
-    return cm, redis_mock
-
-
-# ---------------------------------------------------------------------------
-# New user → consent prompt
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_new_user_receives_consent_prompt_marathi():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+919876543210", "नमस्कार")
-    assert "महाराष्ट्र किसान AI" in response
-    assert "हो" in response
-
-
-@pytest.mark.asyncio
-async def test_new_user_english_hi_receives_bilingual_consent():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+919876543210", "hi")
-    assert "Welcome to Maharashtra Kisan AI" in response
-    assert "YES" in response
-
-
-# ---------------------------------------------------------------------------
-# Consent step
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_consent_hao_in_marathi_advances_to_name():
-    session_data = {"phone": "+91123", "state": "awaiting_consent",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "हो")
-    assert "नाव" in response or "name" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_consent_yes_english_advances_to_name():
-    session_data = {"phone": "+91123", "state": "awaiting_consent",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "YES")
-    assert "नाव" in response or "name" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_consent_ha_alternate_accepted():
-    session_data = {"phone": "+91123", "state": "awaiting_consent",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "ha")
-    assert "नाव" in response or "name" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_consent_nahi_in_marathi_opts_out():
-    session_data = {"phone": "+91123", "state": "awaiting_consent",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "नाही")
-    assert "नाकारण्यात" in response or "declined" in response.lower() or "ठीक" in response
-
-
-@pytest.mark.asyncio
-async def test_consent_invalid_reply_prompts_retry():
-    session_data = {"phone": "+91123", "state": "awaiting_consent",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "कदाचित")
-    assert "हो" in response or "YES" in response
-
-
-# ---------------------------------------------------------------------------
-# Name step
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_name_marathi_accepted():
-    session_data = {"phone": "+91123", "state": "awaiting_name",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "रामराव पाटील")
-    assert "रामराव पाटील" in response or "जिल्हा" in response
-
-
-@pytest.mark.asyncio
-async def test_name_single_char_rejected():
-    session_data = {"phone": "+91123", "state": "awaiting_name",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "र")
-    assert "नाव" in response or "name" in response.lower()
-
-
-# ---------------------------------------------------------------------------
-# District step
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_district_latur_marathi():
-    session_data = {"phone": "+91123", "state": "awaiting_district",
-                    "name": "रामराव", "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "लातूर")
-    assert "पीक" in response or "crop" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_district_nanded_english():
-    session_data = {"phone": "+91123", "state": "awaiting_district",
-                    "name": "Ramrao", "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "nanded")
-    assert "पीक" in response or "crop" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_district_akola_marathi():
-    session_data = {"phone": "+91123", "state": "awaiting_district",
-                    "name": "सुभाष", "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "अकोला")
-    assert "पीक" in response or "crop" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_district_invalid_prompts_retry():
-    session_data = {"phone": "+91123", "state": "awaiting_district",
-                    "name": "Ravi", "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "पुणे")
-    assert "Latur" in response or "ओळखता" in response
-
-
-# ---------------------------------------------------------------------------
-# Crops step
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_crop_soyabean_marathi():
-    session_data = {"phone": "+91123", "state": "awaiting_crops",
-                    "name": "रामराव", "district": "latur", "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "सोयाबीन")
-    assert "भाषा" in response or "language" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_crop_tur_transliteration():
-    session_data = {"phone": "+91123", "state": "awaiting_crops",
-                    "name": "रामराव", "district": "nanded", "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "tur")
-    assert "भाषा" in response or "language" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_crop_multiple_comma_separated():
-    session_data = {"phone": "+91123", "state": "awaiting_crops",
-                    "name": "Suresh", "district": "akola", "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "सोयाबीन, कापूस")
-    assert "भाषा" in response or "language" in response.lower()
-
-
-@pytest.mark.asyncio
-async def test_crop_invalid_prompts_retry():
-    session_data = {"phone": "+91123", "state": "awaiting_crops",
-                    "name": "Ravi", "district": "latur", "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "गहू")
-    assert "Soyabean" in response or "ओळखता" in response
-
-
-# ---------------------------------------------------------------------------
-# Language step
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_language_1_marathi_completes_onboarding():
-    session_data = {"phone": "+91123", "state": "awaiting_language",
-                    "name": "रामराव", "district": "latur", "crops": ["soyabean"],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._persist_to_db", new_callable=AsyncMock):
-            response = await handle("+91123", "1")
-    assert "नोंदणी पूर्ण" in response or "भाव" in response
-
-
-@pytest.mark.asyncio
-async def test_language_2_english_completes_onboarding():
-    session_data = {"phone": "+91123", "state": "awaiting_language",
-                    "name": "Ramrao", "district": "latur", "crops": ["cotton"],
-                    "preferred_language": "en", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._persist_to_db", new_callable=AsyncMock):
-            response = await handle("+91123", "2")
-    assert "Registration complete" in response
-
-
-@pytest.mark.asyncio
-async def test_language_marathi_text_accepted():
-    session_data = {"phone": "+91123", "state": "awaiting_language",
-                    "name": "सुभाष", "district": "jalna", "crops": ["tur"],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._persist_to_db", new_callable=AsyncMock):
-            response = await handle("+91123", "मराठी")
-    assert "नोंदणी पूर्ण" in response
-
-
-# ---------------------------------------------------------------------------
-# STOP from any state
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_stop_marathi_from_awaiting_name():
-    session_data = {"phone": "+91123", "state": "awaiting_name",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": True}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._log_consent_event", new_callable=AsyncMock):
-            response = await handle("+91123", "थांबा")
-    assert "opted out" in response.lower() or "वगळण्यात" in response
-
-
-@pytest.mark.asyncio
-async def test_band_marathi_stop_command():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._log_consent_event", new_callable=AsyncMock):
-            response = await handle("+91123", "बंद")
-    assert "opted out" in response.lower() or "वगळण्यात" in response
-
-
-@pytest.mark.asyncio
-async def test_stop_uppercase_english():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        with patch("src.handlers.onboarding._log_consent_event", new_callable=AsyncMock):
-            response = await handle("+91999", "STOP")
-    assert "opted out" in response.lower() or "वगळण्यात" in response
-
-
-# ---------------------------------------------------------------------------
-# DELETE from any state
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_delete_marathi_triggers_confirmation():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "माझा डेटा हटवा")
-    assert "DELETE CONFIRM" in response
-
-
-@pytest.mark.asyncio
-async def test_delete_english_triggers_confirmation():
-    cm, _ = _make_redis_mock()
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91999", "delete my data")
-    assert "DELETE CONFIRM" in response
-
-
-# ---------------------------------------------------------------------------
-# Already opted-out user
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_opted_out_user_gets_rejoin_message():
-    session_data = {"phone": "+91123", "state": "opted_out",
-                    "name": None, "district": None, "crops": [],
-                    "preferred_language": "mr", "consent_given": False}
-    cm, _ = _make_redis_mock(session_data)
-    with patch("src.handlers.onboarding.aioredis.from_url", return_value=cm):
-        response = await handle("+91123", "सोयाबीन भाव")
-    assert "Hi" in response or "opted out" in response.lower() or "बाहेर" in response
+from src.onboarding.states import OnboardingContext, OnboardingState
+from src.onboarding.machine import OnboardingMachine
+
+
+class TestOnboardingContext:
+    def test_to_dict_and_from_dict(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_NAME,
+            consent_given=True,
+            name="Rajesh",
+            preferred_language="mr",
+        )
+        d = ctx.to_dict()
+        assert d["state"] == "awaiting_name"
+        ctx2 = OnboardingContext.from_dict(d)
+        assert ctx2.state == OnboardingState.AWAITING_NAME
+        assert ctx2.name == "Rajesh"
+
+    def test_is_complete(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.ACTIVE,
+            consent_given=True,
+            name="Rajesh",
+            district="pune",
+            crops=["onion", "tur"],
+        )
+        assert ctx.is_complete()
+
+    def test_is_complete_missing_crops(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_CROPS,
+            consent_given=True,
+            name="Rajesh",
+            district="pune",
+            crops=[],
+        )
+        assert not ctx.is_complete()
+
+
+class TestOnboardingMachine:
+    @pytest.mark.asyncio
+    async def test_new_to_awaiting_consent(self):
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = None
+        ctx, reply = await machine.process("919876543210", "hello")
+        assert ctx.state == OnboardingState.AWAITING_CONSENT
+        assert "नमस्कार" in reply
+
+    @pytest.mark.asyncio
+    async def test_consent_yes_marathi(self):
+        ctx = OnboardingContext(phone="919876543210", state=OnboardingState.AWAITING_CONSENT)
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "हो")
+        assert ctx.state == OnboardingState.AWAITING_NAME
+        assert "नाव" in reply
+
+    @pytest.mark.asyncio
+    async def test_consent_no(self):
+        ctx = OnboardingContext(phone="919876543210", state=OnboardingState.AWAITING_CONSENT)
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "नाही")
+        assert ctx.state == OnboardingState.OPTED_OUT
+
+    @pytest.mark.asyncio
+    async def test_name_entry(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_NAME,
+            consent_given=True,
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "राजेश")
+        assert ctx.state == OnboardingState.AWAITING_DISTRICT
+        assert ctx.name == "राजेश"
+
+    @pytest.mark.asyncio
+    async def test_district_pune(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_DISTRICT,
+            name="Rajesh",
+            consent_given=True,
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "पुणे")
+        assert ctx.state == OnboardingState.AWAITING_CROPS
+        assert ctx.district == "pune"
+
+    @pytest.mark.asyncio
+    async def test_crops_english(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_CROPS,
+            name="Rajesh",
+            consent_given=True,
+            district="nashik",
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "onion tur")
+        assert ctx.state == OnboardingState.AWAITING_LANGUAGE
+        assert "onion" in ctx.crops
+        assert "tur" in ctx.crops
+
+    @pytest.mark.asyncio
+    async def test_language_mr(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_LANGUAGE,
+            name="Rajesh",
+            consent_given=True,
+            district="pune",
+            crops=["onion"],
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "MR")
+        assert ctx.state == OnboardingState.ACTIVE
+        assert ctx.preferred_language == "mr"
+
+    @pytest.mark.asyncio
+    async def test_stop_at_any_state(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_CROPS,
+            consent_given=True,
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "STOP")
+        assert ctx.state == OnboardingState.OPTED_OUT
+
+    @pytest.mark.asyncio
+    async def test_delete_at_any_state(self):
+        ctx = OnboardingContext(
+            phone="919876543210",
+            state=OnboardingState.AWAITING_NAME,
+            consent_given=True,
+        )
+        machine = OnboardingMachine(store=AsyncMock())
+        machine.store.load.return_value = ctx
+        ctx, reply = await machine.process("919876543210", "DELETE")
+        assert ctx.state == OnboardingState.ERASURE_REQUESTED
