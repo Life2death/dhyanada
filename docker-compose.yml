@@ -1,73 +1,84 @@
-version: "3.9"
+version: "3.8"
 
 services:
-  db:
+  # PostgreSQL 16 - Main database
+  postgres:
     image: postgres:16-alpine
-    restart: unless-stopped
+    container_name: kisan_ai_postgres
     environment:
       POSTGRES_USER: kisan
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: kisanai
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
+      POSTGRES_PASSWORD: kisan_secure_dev_password  # Change in production!
+      POSTGRES_DB: kisan_ai
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=en_US.UTF-8"
     ports:
       - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Optional: Initialize database with SQL files
+      # - ./init-scripts:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U kisan -d kisanai"]
+      test: ["CMD-SHELL", "pg_isready -U kisan -d kisan_ai"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    networks:
+      - kisan_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # Redis 7 - Cache and message queue
   redis:
     image: redis:7-alpine
-    restart: unless-stopped
-    command: redis-server --save 60 1 --loglevel warning
-    volumes:
-      - redis_data:/data
+    container_name: kisan_ai_redis
+    command: redis-server --appendonly yes
     ports:
       - "6379:6379"
+    volumes:
+      - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    networks:
+      - kisan_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  app:
-    build: .
-    restart: unless-stopped
-    ports:
-      - "${APP_PORT:-8000}:8000"
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    volumes:
-      - ./src:/app/src
-
-  worker:
-    build: .
-    restart: unless-stopped
-    command: celery -A src.scheduler.celery_app worker --loglevel=info
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
-  beat:
-    build: .
-    restart: unless-stopped
-    command: celery -A src.scheduler.celery_app beat --loglevel=info
-    env_file: .env
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+  # FastAPI Application (optional - for docker-compose up to include app)
+  # Uncomment to run app in Docker
+  # app:
+  #   build: .
+  #   container_name: kisan_ai_app
+  #   environment:
+  #     DATABASE_URL: postgresql://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
+  #     REDIS_URL: redis://redis:6379
+  #     WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID}
+  #     WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
+  #   ports:
+  #     - "8000:8000"
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   networks:
+  #     - kisan_network
 
 volumes:
   postgres_data:
+    driver: local
   redis_data:
+    driver: local
+
+networks:
+  kisan_network:
+    driver: bridge

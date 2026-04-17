@@ -19,3 +19,10 @@ Format:
  - Trade-off accepted: Slightly more complex API than heyoo, but higher reliability for production and future Meta changes
  - Evaluation: `vendor-research/01-whatsapp-wrapper.md`
  - Marathi requirement: Noted. Templates, message text, and captions support UTF-8 Marathi natively. Transliteration module (Module 9) will handle Hinglish↔Marathi conversion
+- **2026-04-17 — Module 3: Docker Compose (Postgres 16 + Redis 7)**
+ - Chose: Official `postgres:16-alpine` + `redis:7-alpine`
+ - Runner-up: Cloud-managed services (AWS RDS/ElastiCache - considered but defer to Module 6)
+ - Why: Local development simplicity, same services for prod, Alpine images lightweight, built-in health checks
+ - Trade-off accepted: Self-managed vs cloud (manageable for MVP, migrate to AWS later if needed)
+ - Evaluation: `vendor-research/02-docker-compose.md`
+ - Configuration: Named volumes for persistence, network isolation, environment-based config
