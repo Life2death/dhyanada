@@ -30,6 +30,8 @@ class Intent(str, Enum):
     PRICE_QUERY = "price_query"
     WEATHER_QUERY = "weather_query"  # Phase 2 Module 1: weather forecast queries
     PEST_QUERY = "pest_query"  # Phase 2 Module 3: image-based pest diagnosis
+    SCHEME_QUERY = "scheme_query"  # Phase 2 Module 4: eligible government schemes
+    MSP_ALERT = "msp_alert"  # Phase 2 Module 4: MSP price alerts
     SUBSCRIBE = "subscribe"
     UNSUBSCRIBE = "unsubscribe"
     ONBOARDING = "onboarding"
