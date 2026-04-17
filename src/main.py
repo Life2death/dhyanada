@@ -93,49 +93,95 @@ async def verify_webhook(
 async def receive_message(request: Request):
     """
     Receive incoming WhatsApp messages from Meta.
-    
+
     Meta sends incoming messages as webhook POST requests.
-    We parse, log, and route them for processing.
+    We parse, classify intent, and route to appropriate handlers.
+
+    Flow:
+    1. Parse Meta webhook format
+    2. Classify intent (PRICE_QUERY, WEATHER_QUERY, SUBSCRIBE, etc.)
+    3. Route to handler (PriceHandler, WeatherHandler, OnboardingHandler, etc.)
+    4. Send reply via WhatsApp
+    5. Log to database (conversation history + audit trail)
     """
     try:
+        from src.handlers.webhook import parse_webhook_message, handle_message
+        from src.classifier.intents import Intent
+        from src.weather.handler import WeatherHandler
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+
         data = await request.json()
         logger.debug(f"Incoming webhook: {json.dumps(data, indent=2)}")
-        
+
         # Extract message from Meta's webhook format
-        # Meta sends: {"entry": [{"changes": [{"value": {"messages": [...]}}]}]}
-        
         if "entry" not in data:
             return JSONResponse({"status": "received"}, status_code=200)
-        
-        for entry in data.get("entry", []):
-            for change in entry.get("changes", []):
-                value = change.get("value", {})
-                
-                # Handle incoming messages
-                for message in value.get("messages", []):
-                    from_phone = message.get("from")
-                    message_id = message.get("id")
-                    message_type = message.get("type", "text")
-                    
-                    # Extract text content
-                    text_content = ""
-                    if message_type == "text":
-                        text_content = message.get("text", {}).get("body", "")
-                    
-                    logger.info(f"📱 Message from {from_phone}: {text_content}")
-                    
-                    # TODO: Route to intent classifier
-                    # For now, just acknowledge receipt
-        
+
+        # Parse messages using webhook handler
+        messages = parse_webhook_message(data)
+
+        # Setup database session for handlers
+        engine = create_async_engine(settings.database_url)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        # Process each message
+        for msg in messages:
+            if not msg.is_text() or not msg.text:
+                logger.info(f"⚠️  Non-text message from {msg.from_phone}, skipping")
+                continue
+
+            logger.info(f"📱 Message from {msg.from_phone}: {msg.text}")
+
+            try:
+                # Classify intent
+                result = await handle_message(msg)
+                intent_type = Intent(result.get("intent", "unknown"))
+
+                logger.info(
+                    f"🧠 Classified: intent={intent_type.value} confidence={result.get('confidence', 0):.2f}"
+                )
+
+                # Route based on intent
+                async with async_session() as session:
+                    whatsapp = WhatsAppAdapter()
+
+                    # Weather query (Phase 2)
+                    if intent_type == Intent.WEATHER_QUERY:
+                        handler = WeatherHandler(session)
+                        # For now, assume farmer's default district
+                        # In production, look up farmer profile from database
+                        reply = await handler.handle(
+                            result,
+                            farmer_apmc="pune",  # TODO: lookup from farmer profile
+                            farmer_language="mr",  # TODO: lookup from farmer profile
+                        )
+                        await whatsapp.send_text_message(msg.from_phone, reply)
+                        logger.info(f"✅ Sent weather reply to {msg.from_phone}")
+
+                    # Other intents (PRICE_QUERY, SUBSCRIBE, ONBOARDING, etc.)
+                    # TODO: Add handlers for these intents
+                    else:
+                        logger.info(f"ℹ️  Intent {intent_type.value} not yet routed (stub)")
+
+            except Exception as e:
+                logger.error(f"❌ Error processing message from {msg.from_phone}: {e}", exc_info=True)
+
         # Always respond with 200 OK to acknowledge receipt
         return JSONResponse({"status": "received"}, status_code=200)
-    
+
     except Exception as e:
-        logger.error(f"❌ Error processing webhook: {e}")
+        logger.error(f"❌ Error processing webhook: {e}", exc_info=True)
         return JSONResponse(
             {"status": "error", "message": str(e)},
             status_code=500,
         )
+
+    finally:
+        try:
+            await engine.dispose()
+        except:
+            pass
 
 
 # Status endpoint

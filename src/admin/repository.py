@@ -264,6 +264,46 @@ class AdminRepository:
             partial_failures=partial_failures,
         )
 
+    async def get_weather_coverage(self) -> dict:
+        """Get weather data freshness and coverage per district (Phase 2).
+
+        Returns dict with per-district: last_update timestamp, is_stale boolean.
+        """
+        from src.models.weather import WeatherObservation
+        from datetime import timedelta
+
+        districts = ["pune", "nashik", "ahilyanagar", "navi_mumbai", "mumbai"]
+        coverage = {}
+
+        try:
+            for dist in districts:
+                # Get most recent weather observation
+                stmt = select(WeatherObservation).where(
+                    WeatherObservation.apmc == dist
+                ).order_by(WeatherObservation.fetched_at.desc()).limit(1)
+
+                result = await self.session.execute(stmt)
+                obs = result.scalar()
+
+                if obs:
+                    is_stale = obs.fetched_at < datetime.now(obs.fetched_at.tzinfo) - timedelta(hours=6)
+                    coverage[dist] = {
+                        "last_update": obs.fetched_at.isoformat(),
+                        "is_stale": is_stale,
+                        "source": obs.source,
+                    }
+                else:
+                    coverage[dist] = {
+                        "last_update": None,
+                        "is_stale": True,
+                        "source": None,
+                    }
+
+        except Exception as exc:
+            logger.exception("get_weather_coverage: failed")
+
+        return coverage
+
     async def get_dashboard_data(self) -> AdminDashboardData:
         """Complete dashboard snapshot."""
         dau = await self.get_dau_today()

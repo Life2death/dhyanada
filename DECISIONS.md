@@ -12,6 +12,20 @@ Format:
 
 ---
 
+- **2026-04-17 — Phase 2 Module 1: Weather Integration**
+  - Chose: Multi-source ingestion (IMD primary, OpenWeather fallback) + async orchestrator pattern
+  - Runner-up: Single OpenWeather API; local weather service
+  - Why: IMD is India's official meteorological source (free, authoritative, state-level accuracy); OpenWeather provides reliable real-time fallback; multi-source pattern mirrors successful price pipeline for consistency and resilience
+  - Trade-off accepted: 2 APIs to maintain vs 1 (higher maintenance). Mitigated by: (1) isolated source failures (one API down doesn't block ingestion if other healthy), (2) preference rules (IMD > OpenWeather) ensure deterministic winner selection
+  - Implementation:
+    - Database: weather_observations table stores: date, apmc, metric (temperature/rainfall/humidity/wind/pressure), value, unit, min/max, forecast_days_ahead, condition, advisory, source, raw_payload (JSONB), is_stale
+    - Sources: IMD API (grid data endpoint, free, 1-2s latency) + OpenWeather (free tier: 60 calls/min, real-time)
+    - Pipeline: Async fetch from all sources → normalize field names → deduplicate per (date, apmc, metric, forecast_days_ahead) → upsert to PostgreSQL with ON CONFLICT
+    - Query layer: Repository with Redis cache (6h TTL) + forecast lookup; formatter for Marathi/English replies
+    - Intent: New WEATHER_QUERY intent; regex patterns for English/Marathi/Hinglish ("weather", "हवामान", "पाऊस", "forecast", "temperature", etc.); metric extraction (temperature, rainfall, humidity, wind_speed)
+    - Scheduler: Daily ingestion at 6:00 AM IST (30 min before price broadcast), Celery task with 3x retry
+  - Evaluation: Extensible architecture (new sources only require WeatherSource.fetch()); graceful degradation; production patterns from price ingestion
+
 - **2026-04-17 — Module 11: DPDPA Consent Flow + Right-to-Erasure**
   - Chose: Explicit opt-in via "हो" + 30-day erasure window + immutable ConsentEvent audit trail
   - Runner-up: Implicit consent on first message; immediate hard-delete on STOP

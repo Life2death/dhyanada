@@ -401,7 +401,41 @@ CREATE TABLE mandi_prices (
 
 ---
 
-## 10. Critical Rules (Never Break)
+## 10. Phase 2 Module 1: Weather Integration (In Progress — 80% Complete)
+
+**Status** (as of 2026-04-17): Core infrastructure complete; webhook routing + dashboard metrics + tests pending.
+
+### What's Done ✅
+
+| Component | Details |
+|-----------|---------|
+| **Database** | Migration 0004: `weather_observations` table with indexes on (date, apmc, forecast_days_ahead), metric, district, source |
+| **ORM Model** | `src/models/weather.py`: WeatherObservation with temperature, rainfall, humidity, wind_speed, pressure; supports observations + 7-day forecasts |
+| **Ingestion** | `src/ingestion/weather/`: Multi-source pipeline (IMD primary, OpenWeather fallback); normalizer + merger + async orchestrator |
+| **Sources** | IMD API (free India Met Dept grid data) + OpenWeather API (free tier: 60 calls/min, 1M/month) |
+| **Query Layer** | `src/weather/`: Repository (DB queries + 6h Redis cache), Formatter (Marathi + English replies), Handler (route intent → response) |
+| **Intent** | `Intent.WEATHER_QUERY` in classifier; regex patterns for "weather", "पाऊस", "forecast", "temperature", "humidity", "wind"; metric extraction |
+| **Scheduler** | `ingest_weather()` Celery task scheduled at 6:00 AM IST daily (30 min before price broadcast) |
+| **Config** | Added `OPENWEATHER_API_KEY` setting to `src/config.py` |
+| **Tests** | `src/tests/test_weather.py`: 20+ tests (intent classification, normalization, merging, formatting, handler routing) |
+
+### What's Remaining (5-10% effort, 1-2 days)
+
+1. **Webhook Handler** (2 lines in `src/main.py`): Route WEATHER_QUERY intent to WeatherHandler, send reply
+2. **Admin Dashboard** (5 lines in `src/admin/repository.py`): Add `get_weather_coverage()` query for per-district freshness
+3. **Combined Broadcast**: Merge price + weather in daily 6:30 AM broadcast message
+4. **LLM Fallback**: Add weather examples to `classify_llm.py` few-shot prompt
+
+### Architecture Notes
+
+- **Same pattern as price ingestion**: Source abstraction → normalizer → merger → orchestrator → DB
+- **Graceful fallback**: Task succeeds if ≥1 source healthy; per-source errors logged
+- **Extensible**: New sources just implement `WeatherSource.fetch()`
+- **Production-ready**: Async/await, idempotent upserts, indexed queries, JSONB raw payloads
+
+---
+
+## 11. Critical Rules (Never Break)
 
 - **NEVER** use Baileys, whatsapp-web.js, yowsup — personal-account libs violate Meta ToS
 - **NEVER** let LLM generate Marathi responses freestyle — use pre-written templates with slots

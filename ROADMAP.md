@@ -80,18 +80,31 @@ No apps to download. No English needed. Zero cost for farmers.
 
 ---
 
-## Phase 2: Smart Farmer Assistant (Target: June–July 2026)
+## Phase 2: Smart Farmer Assistant (In Progress — Module 1 Weather: 80% complete)
 
 **Goal**: Turn the bot into a **daily companion**.
 
-**Key Features to Add**
-- Voice message support (Meta native + Whisper/Marathi STT)
-- Photo upload → hybrid pest & disease diagnosis  
+### Phase 2 Module 1: Weather Integration (✅ CORE COMPLETE — April 17, 2026)
+
+**Status**: Core infrastructure done (80% complete)
+- ✅ Database migration + ORM model (weather_observations table)
+- ✅ Multi-source ingestion (IMD API + OpenWeather fallback)
+- ✅ Normalizer + Merger + Orchestrator pipeline
+- ✅ Query layer (repository + formatter + handler)
+- ✅ Intent classification (WEATHER_QUERY + regex patterns)
+- ✅ Celery scheduler (daily 6:00 AM IST)
+- ✅ Config updates + 20+ tests
+- ⏳ Webhook routing for weather replies (2-3 lines)
+- ⏳ Admin dashboard weather metrics
+- ⏳ Combined price + weather broadcast
+
+**Remaining Phase 2 Modules**:
+- Module 2: Voice message support (Meta native + Whisper/Marathi STT)
+- Module 3: Photo upload → hybrid pest & disease diagnosis  
   → Local TensorFlow model (top 20 pests) + Gemini Vision fallback
-- Weather integration (IMD/OpenWeather) + combined price + weather advisory
-- Government schemes & MSP alerts (PM-KISAN, crop insurance, subsidies)
-- Price alerts ("notify me when onion > ₹5000")
-- Conversation memory (Redis-based last 10 messages)
+- Module 4: Government schemes & MSP alerts (PM-KISAN, crop insurance, subsidies)
+- Module 5: Price alerts ("notify me when onion > ₹5000")
+- Module 6: Conversation memory (Redis-based last 10 messages)
 
 ---
 
