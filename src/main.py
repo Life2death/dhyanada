@@ -290,11 +290,12 @@ async def receive_message(request: Request):
                             scheme_handler = SchemeHandler(session)
                             farmer_language = farmer.preferred_language or "mr"
                             farmer_crops = await farmer_svc.get_crops(farmer.id) or ["wheat"]
-                            # TODO: Add age and land_hectares to Farmer model
-                            # For now, use reasonable defaults
+                            # Use real farmer data, or reasonable defaults if not provided
+                            farmer_age = farmer.age or 35
+                            farmer_land = float(farmer.land_hectares) if farmer.land_hectares else 2.0
                             reply = await scheme_handler.handle_scheme_query(
-                                farmer_age=35,  # TODO: from farmer profile
-                                farmer_land_hectares=2.0,  # TODO: from farmer profile
+                                farmer_age=farmer_age,
+                                farmer_land_hectares=farmer_land,
                                 farmer_crops=farmer_crops,
                                 farmer_district=farmer.district or "pune",
                                 farmer_language=farmer_language,

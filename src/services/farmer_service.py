@@ -108,6 +108,8 @@ class FarmerService:
                 "farmer_id": farmer.id,
                 "phone": farmer.phone,
                 "name": farmer.name,
+                "age": farmer.age,
+                "land_hectares": float(farmer.land_hectares) if farmer.land_hectares else None,
                 "district": farmer.district,
                 "language": farmer.preferred_language or "mr",
                 "subscription_status": farmer.subscription_status,

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional, List
 
-from sqlalchemy import String, Integer, DateTime, Index, ForeignKey
+from sqlalchemy import String, Integer, DateTime, Index, ForeignKey, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -14,7 +14,9 @@ class Farmer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(100))
+    age: Mapped[Optional[int]] = mapped_column(Integer)  # Farmer's age (for scheme eligibility)
     district: Mapped[Optional[str]] = mapped_column(String(50))
+    land_hectares: Mapped[Optional[float]] = mapped_column(Numeric(precision=8, scale=2))  # Farm size in hectares
     preferred_language: Mapped[str] = mapped_column(String(10), default="mr")
     plan_tier: Mapped[str] = mapped_column(String(20), default="free")
     subscription_status: Mapped[str] = mapped_column(String(20), default="none")
