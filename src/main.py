@@ -176,16 +176,22 @@ async def receive_message(request: Request):
 
                 # Route based on intent
                 async with async_session() as session:
+                    from src.services.farmer_service import FarmerService
+                    farmer_svc = FarmerService(session)
+
+                    # Look up farmer profile
+                    farmer = await farmer_svc.get_by_phone(msg.from_phone)
 
                     # Weather query (Phase 2 Module 1)
                     if intent_type == Intent.WEATHER_QUERY:
                         handler = WeatherHandler(session)
-                        # For now, assume farmer's default district
-                        # In production, look up farmer profile from database
+                        # Use farmer's district from profile, or default to "pune"
+                        farmer_district = farmer.district if farmer else "pune"
+                        farmer_language = farmer.preferred_language if farmer else "mr"
                         reply = await handler.handle(
                             result,
-                            farmer_apmc="pune",  # TODO: lookup from farmer profile
-                            farmer_language="mr",  # TODO: lookup from farmer profile
+                            farmer_apmc=farmer_district,
+                            farmer_language=farmer_language,
                         )
                         await whatsapp.send_text_message(msg.from_phone, reply)
                         logger.info(f"✅ Sent weather reply to {msg.from_phone}")
@@ -205,11 +211,12 @@ async def receive_message(request: Request):
                         diagnoser = ImageDiagnoser(diagnoser_config)
                         handler = DiagnosisHandler(diagnoser)
 
+                        farmer_language = farmer.preferred_language if farmer else "mr"
                         reply = await handler.handle(
                             result,
                             media_url=msg.media_url,
                             farmer_phone=msg.from_phone,
-                            farmer_language="mr",  # TODO: lookup from farmer profile
+                            farmer_language=farmer_language,
                         )
                         await whatsapp.send_text_message(msg.from_phone, reply)
                         logger.info(f"✅ Sent diagnosis reply to {msg.from_phone}")
@@ -221,13 +228,16 @@ async def receive_message(request: Request):
                         from src.price.models import PriceQuery
 
                         price_repo = PriceRepository(session)
-                        # TODO: lookup farmer profile for district and language
+                        # Use district from query result, or fall back to farmer's district
+                        query_district = result.get("district") or (farmer.district if farmer else None)
+                        farmer_language = farmer.preferred_language if farmer else "mr"
+
                         query = PriceQuery(
                             commodity=result.get("commodity", ""),
-                            district=result.get("district"),
+                            district=query_district,
                         )
-                        price_result = await price_repo.query(query)
-                        reply = format_price_reply(price_result, lang="mr")
+                        price_result = await price_repo.query(query, farmer_district=query_district)
+                        reply = format_price_reply(price_result, lang=farmer_language)
                         if reply:
                             await whatsapp.send_text_message(msg.from_phone, reply)
                             logger.info(f"✅ Sent price reply to {msg.from_phone}")
@@ -236,63 +246,100 @@ async def receive_message(request: Request):
                     elif intent_type == Intent.PRICE_ALERT:
                         from src.price.alert_handler import PriceAlertHandler
 
-                        alert_handler = PriceAlertHandler(session)
-                        # TODO: lookup farmer_id and language from farmer profile
-                        reply = await alert_handler.handle_subscription(
-                            farmer_id="placeholder_id",  # TODO: actual farmer_id from lookup
-                            commodity=result.get("commodity", ""),
-                            threshold=0.0,  # TODO: extract from message
-                            condition=">",
-                            district=result.get("district"),
-                            farmer_language="mr",
-                        )
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Sent price alert confirmation to {msg.from_phone}")
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Price alert requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            alert_handler = PriceAlertHandler(session)
+                            farmer_language = farmer.preferred_language or "mr"
+                            # TODO: Extract actual threshold from message (e.g., "₹5,000")
+                            # For now, set a default threshold
+                            reply = await alert_handler.handle_subscription(
+                                farmer_id=str(farmer.id),
+                                commodity=result.get("commodity", ""),
+                                threshold=5000.0,  # TODO: extract from message
+                                condition=">",
+                                district=result.get("district") or farmer.district,
+                                farmer_language=farmer_language,
+                            )
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Sent price alert confirmation to {msg.from_phone}")
 
                     # Government scheme query
                     elif intent_type == Intent.SCHEME_QUERY:
                         from src.scheme.handler import SchemeHandler
 
-                        scheme_handler = SchemeHandler(session)
-                        # TODO: lookup farmer profile for age, land, crops, district, language
-                        reply = await scheme_handler.handle_scheme_query(
-                            farmer_age=18,  # TODO: from farmer profile
-                            farmer_land_hectares=2.0,
-                            farmer_crops=["wheat", "cotton"],
-                            farmer_district="pune",  # TODO: from farmer profile
-                            farmer_language="mr",
-                        )
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Sent scheme eligibility to {msg.from_phone}")
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Scheme query requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            scheme_handler = SchemeHandler(session)
+                            farmer_language = farmer.preferred_language or "mr"
+                            farmer_crops = await farmer_svc.get_crops(farmer.id) or ["wheat"]
+                            # TODO: Add age and land_hectares to Farmer model
+                            # For now, use reasonable defaults
+                            reply = await scheme_handler.handle_scheme_query(
+                                farmer_age=35,  # TODO: from farmer profile
+                                farmer_land_hectares=2.0,  # TODO: from farmer profile
+                                farmer_crops=farmer_crops,
+                                farmer_district=farmer.district or "pune",
+                                farmer_language=farmer_language,
+                            )
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Sent scheme eligibility to {msg.from_phone}")
 
                     # MSP alert subscription
                     elif intent_type == Intent.MSP_ALERT:
                         from src.scheme.handler import SchemeHandler
 
-                        scheme_handler = SchemeHandler(session)
-                        # TODO: lookup farmer_id, language from farmer profile
-                        reply = await scheme_handler.handle_msp_alert(
-                            farmer_id="placeholder_id",  # TODO: actual farmer_id
-                            commodity=result.get("commodity", ""),
-                            alert_threshold=0.0,  # TODO: extract from message
-                            farmer_language="mr",
-                        )
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Sent MSP alert confirmation to {msg.from_phone}")
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"MSP alert requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            scheme_handler = SchemeHandler(session)
+                            farmer_language = farmer.preferred_language or "mr"
+                            # TODO: Extract actual threshold from message (e.g., "₹3,000")
+                            reply = await scheme_handler.handle_msp_alert(
+                                farmer_id=str(farmer.id),
+                                commodity=result.get("commodity", ""),
+                                alert_threshold=3000.0,  # TODO: extract from message
+                                farmer_language=farmer_language,
+                            )
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Sent MSP alert confirmation to {msg.from_phone}")
 
                     # Subscribe to daily broadcast
                     elif intent_type == Intent.SUBSCRIBE:
-                        # TODO: update farmer subscription_status to 'active'
-                        reply = "✅ आपले दैनिक किंमत सूचना सक्षम केली.\n\nहे आपल्याला दररोज सकाळी 6:30 वाजता येईल."
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Subscribed farmer {msg.from_phone}")
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Subscribe requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            success = await farmer_svc.update_subscription_status(farmer.id, "active")
+                            if success:
+                                reply = "✅ आपले दैनिक किंमत सूचना सक्षम केली.\n\nहे आपल्याला दररोज सकाळी 6:30 वाजता येईल."
+                            else:
+                                reply = "❌ सदस्यता अपडेट केली गेली नाही. कृपया पुनः प्रयत्न करा."
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Subscribed farmer {msg.from_phone}")
 
                     # Unsubscribe from broadcast
                     elif intent_type == Intent.UNSUBSCRIBE:
-                        # TODO: update farmer subscription_status to 'inactive'
-                        reply = "❌ आपले दैनिक सूचना बंद केली."
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Unsubscribed farmer {msg.from_phone}")
+                        if not farmer:
+                            reply = "❌ आप नोंदणीकृत नाहीत.\n(You are not registered.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Unsubscribe requested but farmer not found: {msg.from_phone}")
+                        else:
+                            success = await farmer_svc.update_subscription_status(farmer.id, "inactive")
+                            if success:
+                                reply = "✅ आपले दैनिक सूचना बंद केली."
+                            else:
+                                reply = "❌ सदस्यता अपडेट केली गेली नाही. कृपया पुनः प्रयत्न करा."
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Unsubscribed farmer {msg.from_phone}")
 
                     # Onboarding / help / greeting / feedback
                     elif intent_type == Intent.ONBOARDING:
@@ -321,10 +368,27 @@ async def receive_message(request: Request):
                         logger.info(f"✅ Sent greeting to {msg.from_phone}")
 
                     elif intent_type == Intent.FEEDBACK:
-                        # TODO: Log feedback to database
+                        # Log feedback to database if farmer exists
+                        if farmer:
+                            try:
+                                from src.models.conversation import Conversation
+                                feedback = Conversation(
+                                    farmer_id=farmer.id,
+                                    message_type="feedback",
+                                    raw_text=msg.text[:500],  # Store feedback text
+                                    intent=Intent.FEEDBACK.value,
+                                )
+                                session.add(feedback)
+                                await session.commit()
+                                logger.info(f"✅ Logged feedback from farmer_id={farmer.id}")
+                            except Exception as e:
+                                logger.error(f"Error logging feedback: {e}")
+                        else:
+                            logger.info(f"Feedback from non-registered user: {msg.from_phone}")
+
                         reply = "धन्यवाद आपल्या प्रतिक्रियेसाठी! 🙏 आम्ही त्यावर विचार करू."
                         await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Logged feedback from {msg.from_phone}")
+                        logger.info(f"✅ Responded to feedback from {msg.from_phone}")
 
                     else:
                         # Unknown intent
