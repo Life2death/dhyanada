@@ -1,10 +1,16 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        populate_by_name=True,
+    )
 
     # WhatsApp Cloud API
     whatsapp_phone_id: str = ""
@@ -28,8 +34,13 @@ class Settings(BaseSettings):
     admin_username: str = "admin"
     admin_password: str = "changeme"
 
-    # Agmarknet
-    agmarknet_api_key: str = ""
+    # Agmarknet / data.gov.in — accept either env name so existing scripts work.
+    # The key is the same free key issued by data.gov.in for the Agmarknet
+    # resource (9ef84268-d588-465a-a308-a864a43d0070).
+    agmarknet_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("AGMARKNET_API_KEY", "DATA_GOV_IN_API_KEY"),
+    )
 
     @property
     def is_production(self) -> bool:
