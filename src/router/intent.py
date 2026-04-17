@@ -95,11 +95,18 @@ async def classify(message: str) -> IntentResult:
 # ---------------------------------------------------------------------------
 
 def _regex_classify(text: str) -> Optional[str]:
-    """Return first matching intent or None. price_query requires ALL its patterns."""
+    """Return first matching intent or None.
+
+    price_query: matches if both a price-word AND a crop are present, OR if only
+    a crop name is sent (farmers commonly type just the crop to ask its price),
+    OR if only a price-word is sent (e.g. "भाव" = "what's the price?").
+    """
     for intent, patterns in _compiled.items():
         if intent == "price_query":
-            # price_query: at least one pattern from each group must match
-            if all(any(p.search(text) for p in [pat]) for pat in patterns):
+            price_pat, crop_pat = patterns
+            price_match = price_pat.search(text)
+            crop_match = crop_pat.search(text)
+            if price_match or crop_match:
                 return intent
         else:
             if any(p.search(text) for p in patterns):
