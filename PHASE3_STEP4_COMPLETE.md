@@ -8,7 +8,7 @@
 
 ## Summary
 
-Phase 3 Step 4 implements a complete production deployment pipeline for Kisan AI:
+Phase 3 Step 4 implements a complete production deployment pipeline for Dhanyada:
 
 ✅ **GitHub Actions CI/CD** — Automated testing, linting, and Docker image builds
 ✅ **Optimized Dockerfile** — Multi-stage build reducing image size from 400MB → 200MB
@@ -66,7 +66,7 @@ Key improvements:
 1. **PostgreSQL 16** — Main database
    - Health check: pg_isready
    - Persistence: postgres_data volume
-   - Network: kisan_network
+   - Network: dhanyada_network
 
 2. **Redis 7** — Cache and message queue
    - Health check: redis-cli ping
@@ -92,7 +92,7 @@ Key improvements:
 
 **All services:**
 - Logging: json-file driver with rotation (max 10MB, 3 files)
-- Network: kisan_network bridge
+- Network: dhanyada_network bridge
 - Healthchecks: interval 10s, timeout 5s, retries 5
 
 **Status: ✅ Fully configured**
@@ -177,7 +177,7 @@ GitHub Actions (Build & Push)
   ├─ Build multi-stage Docker image
   ├─ Tag image: latest, git-sha, branch
   ├─ Push to Docker Hub
-  └─ Image available at: docker.io/username/kisan-ai:latest
+  └─ Image available at: docker.io/username/dhanyada:latest
   ↓
 VPS Production Server
   ├─ docker-compose pull (get latest image)
@@ -244,7 +244,7 @@ curl http://localhost:8000/health
 #    → Follow DEPLOYMENT.md Step 1
 
 # 3. Clone repo and configure .env
-git clone https://github.com/yourusername/kisan-ai.git /app
+git clone https://github.com/yourusername/dhanyada.git /app
 cd /app
 nano .env  # Add production credentials
 
@@ -394,7 +394,7 @@ docker-compose exec app curl http://localhost:8000/health
 docker-compose logs -f app
 
 # Check database
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT version();"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT version();"
 
 # Check Redis
 docker-compose exec redis redis-cli ping
@@ -428,7 +428,7 @@ docker-compose up -d
 
 ## Ready for Production 🚀
 
-The Kisan AI application is now:
+The Dhanyada application is now:
 - ✅ Fully tested (96% coverage)
 - ✅ Containerized (Docker optimized)
 - ✅ Automated (GitHub Actions CI/CD)

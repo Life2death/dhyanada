@@ -1,8 +1,8 @@
-# Kisan AI Implementation Guide
+# Dhanyada Implementation Guide
 
 ## Overview
 
-Kisan AI is a WhatsApp-based farming bot for Maharashtra farmers, providing real-time market prices, government scheme eligibility, pest diagnosis, and alert subscriptions. Built with Python/FastAPI, PostgreSQL, and Celery.
+Dhanyada is a WhatsApp-based farming bot for Maharashtra farmers, providing real-time market prices, government scheme eligibility, pest diagnosis, and alert subscriptions. Built with Python/FastAPI, PostgreSQL, and Celery.
 
 **Status**: Phase 2 Modules 1-5 complete and production-ready.
 
@@ -100,7 +100,7 @@ Farmer receives: "🌾 कांदा - पुणे मंडी\n💹 भा�
 ```bash
 # Clone & install
 git clone <repo>
-cd kisan-ai
+cd dhanyada
 pip install -r requirements.txt
 
 # Setup database
@@ -118,7 +118,7 @@ celery -A src.scheduler.celery_app beat --loglevel=info
 
 ```bash
 # Database
-DATABASE_URL=postgresql+asyncpg://user:password@localhost/kisan_ai
+DATABASE_URL=postgresql+asyncpg://user:password@localhost/dhanyada
 
 # WhatsApp
 WHATSAPP_PHONE_ID=<business-phone-id>
@@ -542,13 +542,13 @@ pytest -m "not slow" -v
 ### Logs
 ```bash
 # View recent logs
-tail -f /var/log/kisan-ai/app.log
+tail -f /var/log/dhanyada/app.log
 
 # Search for errors
-grep "ERROR" /var/log/kisan-ai/app.log
+grep "ERROR" /var/log/dhanyada/app.log
 
 # Trace specific farmer
-grep "+919876543210" /var/log/kisan-ai/app.log
+grep "+919876543210" /var/log/dhanyada/app.log
 ```
 
 ### Database Queries
@@ -598,6 +598,6 @@ WHERE subscription_status = 'active';
 
 ## Support
 
-For issues, contact: support@kisanai.com
+For issues, contact: support@dhanyada.com
 For contributions: See CONTRIBUTING.md
 For architecture questions: See ARCHITECTURE.md

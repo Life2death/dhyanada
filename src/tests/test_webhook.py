@@ -26,7 +26,7 @@ def test_webhook_verification(client):
         params={
             "hub.mode": "subscribe",
             "hub.challenge": "test_challenge_123",
-            "hub.verify_token": "kisan_webhook_token",
+            "hub.verify_token": "dhanyada_webhook_token",
         }
     )
     assert response.status_code == 200

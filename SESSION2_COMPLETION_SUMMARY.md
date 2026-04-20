@@ -241,13 +241,13 @@ Farmer Message → Regex Classification → Farmer Lookup → Handler → DB Upd
 ### 1. Database Setup
 ```bash
 # Create PostgreSQL database
-createdb kisan_ai
+createdb dhanyada
 
 # Apply migrations
 alembic upgrade head
 
 # Verify schema
-psql -d kisan_ai -c "\dt"
+psql -d dhanyada -c "\dt"
 ```
 
 ### 2. Environment Setup

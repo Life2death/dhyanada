@@ -1,4 +1,4 @@
-# Production Deployment Guide — Kisan AI
+# Production Deployment Guide — Dhanyada
 
 ## Quick Start (Local Development)
 
@@ -6,8 +6,8 @@ Get the full stack running locally with docker-compose in 5 minutes:
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/kisan-ai.git
-cd kisan-ai
+git clone https://github.com/yourusername/dhanyada.git
+cd dhanyada
 
 # Copy environment file (edit with your values)
 cp .env.example .env
@@ -45,7 +45,7 @@ Create a `.env` file in the project root with the following:
 
 ```bash
 # Database (PostgreSQL)
-DATABASE_URL=postgresql+asyncpg://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
+DATABASE_URL=postgresql+asyncpg://dhanyada:dhanyada_secure_dev_password@postgres:5432/dhanyada
 
 # Redis Cache
 REDIS_URL=redis://redis:6379
@@ -86,17 +86,17 @@ For production, use a secrets management system (not `.env` files):
 
 **AWS Parameter Store / AWS Secrets Manager:**
 ```bash
-# Store each secret with /kisan-ai/ prefix
-aws secretsmanager create-secret --name /kisan-ai/WHATSAPP_TOKEN --secret-string "your-token"
-aws secretsmanager create-secret --name /kisan-ai/DATABASE_URL --secret-string "postgresql://user:pass@host:5432/db"
+# Store each secret with /dhanyada/ prefix
+aws secretsmanager create-secret --name /dhanyada/WHATSAPP_TOKEN --secret-string "your-token"
+aws secretsmanager create-secret --name /dhanyada/DATABASE_URL --secret-string "postgresql://user:pass@host:5432/db"
 ```
 
 **Or Kubernetes Secrets:**
 ```bash
-kubectl create secret generic kisan-ai-secrets \
+kubectl create secret generic dhanyada-secrets \
   --from-literal=WHATSAPP_TOKEN=token \
   --from-literal=SMTP_PASSWORD=password \
-  -n kisan-ai
+  -n dhanyada
 ```
 
 ---
@@ -110,7 +110,7 @@ kubectl create secret generic kisan-ai-secrets \
 docker-compose up -d postgres
 
 # Wait for PostgreSQL to be healthy
-docker-compose exec postgres pg_isready -U kisan
+docker-compose exec postgres pg_isready -U dhanyada
 
 # Run migrations
 docker-compose exec app alembic upgrade head
@@ -126,23 +126,23 @@ docker-compose exec app alembic current
 ```bash
 # Create RDS instance
 aws rds create-db-instance \
-  --db-instance-identifier kisan-ai-db \
+  --db-instance-identifier dhanyada-db \
   --engine postgres \
   --engine-version 16.1 \
   --db-instance-class db.t3.micro \
   --allocated-storage 100 \
-  --master-username kisan \
+  --master-username dhanyada \
   --master-user-password "secure-password" \
   --vpc-security-group-ids sg-xxx \
   --publicly-accessible false
 
 # After instance is available, run migrations
-DATABASE_URL="postgresql://kisan:password@kisan-ai-db.xxx.us-east-1.rds.amazonaws.com:5432/kisan_ai" \
+DATABASE_URL="postgresql://dhanyada:password@dhanyada-db.xxx.us-east-1.rds.amazonaws.com:5432/dhanyada" \
   alembic upgrade head
 
 # Enable automated backups
 aws rds modify-db-instance \
-  --db-instance-identifier kisan-ai-db \
+  --db-instance-identifier dhanyada-db \
   --backup-retention-period 30 \
   --enable-iam-database-authentication
 ```
@@ -162,11 +162,11 @@ sudo systemctl start postgresql
 
 # Create database and user
 sudo -u postgres psql << EOF
-CREATE USER kisan WITH PASSWORD 'secure-password';
-CREATE DATABASE kisan_ai OWNER kisan;
-GRANT ALL PRIVILEGES ON DATABASE kisan_ai TO kisan;
-\connect kisan_ai
-ALTER SCHEMA public OWNER TO kisan;
+CREATE USER dhanyada WITH PASSWORD 'secure-password';
+CREATE DATABASE dhanyada OWNER dhanyada;
+GRANT ALL PRIVILEGES ON DATABASE dhanyada TO dhanyada;
+\connect dhanyada
+ALTER SCHEMA public OWNER TO dhanyada;
 EOF
 
 # Configure PostgreSQL for remote connections
@@ -174,7 +174,7 @@ sudo nano /etc/postgresql/16/main/postgresql.conf
 # Change: listen_addresses = 'localhost' → listen_addresses = '*'
 
 sudo nano /etc/postgresql/16/main/pg_hba.conf
-# Add: host    kisan_ai    kisan    10.0.0.0/8    md5
+# Add: host    dhanyada    dhanyada    10.0.0.0/8    md5
 
 sudo systemctl restart postgresql
 ```
@@ -206,10 +206,10 @@ docker-compose exec app alembic revision --autogenerate -m "Add new_column to us
 
 ```bash
 # Build image with production optimizations
-docker build -t kisan-ai:latest .
+docker build -t dhanyada:latest .
 
 # Check image size
-docker image ls kisan-ai
+docker image ls dhanyada
 
 # Expected size: ~200MB (multi-stage build optimization)
 
@@ -217,14 +217,14 @@ docker image ls kisan-ai
 docker run -p 8000:8000 \
   -e DATABASE_URL="sqlite:///./test.db" \
   -e REDIS_URL="redis://redis:6379" \
-  --name kisan-ai-test \
-  kisan-ai:latest
+  --name dhanyada-test \
+  dhanyada:latest
 
 # Health check
 curl http://localhost:8000/health
 
 # Stop container
-docker stop kisan-ai-test
+docker stop dhanyada-test
 ```
 
 ### Push to Docker Hub
@@ -234,15 +234,15 @@ docker stop kisan-ai-test
 docker login -u your-username
 
 # Tag image
-docker tag kisan-ai:latest your-username/kisan-ai:latest
-docker tag kisan-ai:latest your-username/kisan-ai:v1.0.0
+docker tag dhanyada:latest your-username/dhanyada:latest
+docker tag dhanyada:latest your-username/dhanyada:v1.0.0
 
 # Push to Docker Hub
-docker push your-username/kisan-ai:latest
-docker push your-username/kisan-ai:v1.0.0
+docker push your-username/dhanyada:latest
+docker push your-username/dhanyada:v1.0.0
 
 # Verify image is available
-docker pull your-username/kisan-ai:latest
+docker pull your-username/dhanyada:latest
 ```
 
 ### GitHub Actions Automatic Builds
@@ -290,7 +290,7 @@ docker-compose --version
 
 ```bash
 # Clone repository
-git clone https://github.com/yourusername/kisan-ai.git /app
+git clone https://github.com/yourusername/dhanyada.git /app
 cd /app
 
 # Create .env file with production secrets
@@ -327,13 +327,13 @@ curl http://localhost:8000/health
 apt-get install -y nginx
 
 # Create Nginx config
-nano /etc/nginx/sites-available/kisan-ai
+nano /etc/nginx/sites-available/dhanyada
 
 # Paste this configuration:
 ```
 
 ```nginx
-upstream kisan_app {
+upstream dhanyada_app {
     server localhost:8000;
 }
 
@@ -360,7 +360,7 @@ server {
 
     # Proxy requests to FastAPI
     location / {
-        proxy_pass http://kisan_app;
+        proxy_pass http://dhanyada_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -371,7 +371,7 @@ server {
 
     # Webhook (high timeout for message processing)
     location /webhook/ {
-        proxy_pass http://kisan_app;
+        proxy_pass http://dhanyada_app;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -384,7 +384,7 @@ server {
 
 ```bash
 # Enable site
-ln -s /etc/nginx/sites-available/kisan-ai /etc/nginx/sites-enabled/
+ln -s /etc/nginx/sites-available/dhanyada /etc/nginx/sites-enabled/
 rm /etc/nginx/sites-enabled/default
 
 # Test Nginx config
@@ -478,7 +478,7 @@ ssh -i your-key.pem ubuntu@your-server-ip
 docker-compose logs -f app
 
 # Check database connection
-docker-compose exec postgres pg_isready -U kisan
+docker-compose exec postgres pg_isready -U dhanyada
 
 # Check Redis connection
 docker-compose exec redis redis-cli ping
@@ -490,7 +490,7 @@ htop
 df -h
 
 # View PostgreSQL database size
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT pg_size_pretty(pg_database_size('kisan_ai'));"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT pg_size_pretty(pg_database_size('dhanyada'));"
 ```
 
 ---
@@ -545,7 +545,7 @@ docker-compose up -d
 
 ```bash
 # Check largest tables
-docker-compose exec postgres psql -U kisan -d kisan_ai << EOF
+docker-compose exec postgres psql -U dhanyada -d dhanyada << EOF
 SELECT 
   schemaname,
   tablename,
@@ -557,7 +557,7 @@ EOF
 
 # Error logs growing too large?
 # Truncate old error logs:
-docker-compose exec postgres psql -U kisan -d kisan_ai << EOF
+docker-compose exec postgres psql -U dhanyada -d dhanyada << EOF
 DELETE FROM error_log WHERE created_at < NOW() - INTERVAL '90 days';
 VACUUM error_log;
 EOF
@@ -689,7 +689,7 @@ docker-compose exec redis redis-cli LLEN celery
 Using AWS ELB or Nginx upstream:
 
 ```nginx
-upstream kisan_apps {
+upstream dhanyada_apps {
     server app-instance-1:8000;
     server app-instance-2:8000;
     server app-instance-3:8000;
@@ -700,7 +700,7 @@ server {
     server_name your-domain.com;
 
     location / {
-        proxy_pass http://kisan_apps;
+        proxy_pass http://dhanyada_apps;
         # ... other proxy settings
     }
 }
@@ -714,13 +714,13 @@ server {
 
 ```bash
 # Backup PostgreSQL database
-docker-compose exec postgres pg_dump -U kisan kisan_ai > kisan_ai_backup.sql
+docker-compose exec postgres pg_dump -U dhanyada dhanyada > dhanyada_backup.sql
 
 # Backup to compressed file
-docker-compose exec postgres pg_dump -U kisan -Fc kisan_ai > kisan_ai_backup.dump
+docker-compose exec postgres pg_dump -U dhanyada -Fc dhanyada > dhanyada_backup.dump
 
 # Restore from backup
-docker-compose exec -T postgres pg_restore -U kisan -d kisan_ai < kisan_ai_backup.dump
+docker-compose exec -T postgres pg_restore -U dhanyada -d dhanyada < dhanyada_backup.dump
 ```
 
 ### Automated Daily Backups
@@ -732,18 +732,18 @@ nano /app/backup.sh
 
 ```bash
 #!/bin/bash
-BACKUP_DIR="/backups/kisan-ai"
+BACKUP_DIR="/backups/dhanyada"
 mkdir -p $BACKUP_DIR
 
 # PostgreSQL backup
-docker-compose exec -T postgres pg_dump -U kisan -Fc kisan_ai > \
+docker-compose exec -T postgres pg_dump -U dhanyada -Fc dhanyada > \
   $BACKUP_DIR/db_$(date +%Y%m%d_%H%M%S).dump
 
 # Keep only last 7 days
 find $BACKUP_DIR -name "db_*.dump" -mtime +7 -delete
 
 # Optional: Upload to S3
-# aws s3 sync $BACKUP_DIR s3://your-backup-bucket/kisan-ai/
+# aws s3 sync $BACKUP_DIR s3://your-backup-bucket/dhanyada/
 ```
 
 ```bash
@@ -759,11 +759,11 @@ crontab -e
 
 ```bash
 # List available backups
-ls -la /backups/kisan-ai/
+ls -la /backups/dhanyada/
 
 # Restore specific backup
-docker-compose exec -T postgres pg_restore -U kisan -d kisan_ai \
-  < /backups/kisan-ai/db_20260418_020000.dump
+docker-compose exec -T postgres pg_restore -U dhanyada -d dhanyada \
+  < /backups/dhanyada/db_20260418_020000.dump
 ```
 
 ---
@@ -807,7 +807,7 @@ systemctl restart ssh
 ```bash
 # AWS Secrets Manager
 aws secretsmanager create-secret \
-  --name kisan-ai/production \
+  --name dhanyada/production \
   --secret-string file://production-secrets.json
 
 # Then reference in docker-compose or deployment:
@@ -894,7 +894,7 @@ docker-compose ps
 docker-compose logs app --tail=100
 
 # 3. Check database integrity
-docker-compose exec postgres psql -U kisan -d kisan_ai \
+docker-compose exec postgres psql -U dhanyada -d dhanyada \
   -c "SELECT COUNT(*) FROM user_table;"
 
 # 4. Monitor in real-time

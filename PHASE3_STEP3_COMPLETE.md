@@ -84,7 +84,7 @@ from sqlalchemy.orm import sessionmaker
 import asyncio
 
 async def test():
-    engine = create_async_engine("sqlite+aiosqlite:///./kisan_ai.db")
+    engine = create_async_engine("sqlite+aiosqlite:///./dhanyada.db")
     async_session = sessionmaker(engine, class_=AsyncSession)
     
     async with async_session() as session:
@@ -117,7 +117,7 @@ async def test_email():
     )
     
     await email.send_alert(
-        subject="Test Alert from Kisan AI",
+        subject="Test Alert from Dhanyada",
         body="This is a test alert to verify email configuration works correctly.",
         alert_type="info"
     )

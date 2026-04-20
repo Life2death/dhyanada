@@ -29,7 +29,7 @@ from src.ingestion.sources.base import PriceRecord, PriceSource
 logger = logging.getLogger(__name__)
 
 _REPORT_URL = "https://nhrdf.org/en-us/DailyWiseMarketArrivals"
-_UA = "KisanAI/0.1 (+https://github.com/Life2death/kisan-ai)"
+_UA = "Dhanyada/0.1 (+https://github.com/Life2death/dhanyada)"
 
 # NHRDF market name → (district_display, district_canonical)
 _MARKET_TO_DISTRICT: dict[str, str] = {

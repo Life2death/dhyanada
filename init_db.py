@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 
 def init_db():
     """Create all tables in SQLite database"""
-    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./kisan_ai.db")
+    db_url = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./dhanyada.db")
     # Convert async URL to sync URL for initialization
     db_url_sync = db_url.replace("+aiosqlite", "").replace("sqlite+", "sqlite:///")
 

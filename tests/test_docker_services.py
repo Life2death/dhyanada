@@ -7,7 +7,7 @@ def test_postgres_running():
     import asyncpg
     import asyncio
     async def check():
-        conn = await asyncpg.connect('postgresql://kisan:kisan_secure_dev_password@localhost:5432/kisan_ai')
+        conn = await asyncpg.connect('postgresql://dhanyada:dhanyada_secure_dev_password@localhost:5432/dhanyada')
         version = await conn.fetchval('SELECT version()')
         await conn.close()
         return "PostgreSQL 16" in version or "postgres" in version.lower()

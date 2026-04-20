@@ -203,7 +203,7 @@ Example nginx config:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name kisan.example.com;
+    server_name dhanyada.example.com;
 
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;

@@ -37,7 +37,7 @@ redis-cli ping
 
 ### Project Structure for Tests
 ```
-kisan-ai/
+dhanyada/
 ├── src/
 │   ├── models/          # Database models
 │   ├── classifier/      # Intent classification
@@ -66,7 +66,7 @@ kisan-ai/
 
 ```bash
 # ✅ RUN SINGLE TEST FILE
-cd /c/Users/vikra/projects/kisan-ai
+cd /c/Users/vikra/projects/dhanyada
 pytest src/tests/test_threshold_parser.py -v
 
 # Expected Output:
@@ -275,7 +275,7 @@ redis-server
 # Or in background: redis-server --daemonize yes
 
 # 3. CREATE TEST DATABASE
-createdb kisan_ai_test
+createdb dhanyada_test
 
 # 4. RUN INTEGRATION TESTS
 pytest src/tests/test_scheduler_tasks.py -v
@@ -310,7 +310,7 @@ Examples:
 # 🚀 START FULL SYSTEM
 
 # Terminal 1: PostgreSQL
-createdb kisan_ai
+createdb dhanyada
 alembic upgrade head
 
 # Terminal 2: Redis
@@ -386,7 +386,7 @@ curl -X POST http://localhost:8000/webhook/whatsapp \
 # Expected: Confirmation message "Alert set for onion > ₹4000"
 
 # 2. Check database
-psql -d kisan_ai -c "SELECT * FROM price_alerts WHERE is_active = true;"
+psql -d dhanyada -c "SELECT * FROM price_alerts WHERE is_active = true;"
 
 # Expected output:
 # id | farmer_id | commodity | condition | threshold | is_active
@@ -448,7 +448,7 @@ locust -f loadtest.py -u 100 -r 10 -t 5m --headless
 # In PostgreSQL: ALTER SYSTEM SET log_min_duration_statement = 1000;
 
 # Run queries and check execution time
-psql -d kisan_ai -c "
+psql -d dhanyada -c "
 EXPLAIN ANALYZE
 SELECT * FROM farmers 
 WHERE district = 'pune' 
@@ -528,7 +528,7 @@ done
 
 # 5. Build Docker Image
 echo "5️⃣ Building Docker image..."
-docker build -t kisan-ai:latest .
+docker build -t dhanyada:latest .
 if [ $? -ne 0 ]; then
     echo "❌ Docker build failed!"
     exit 1
@@ -544,7 +544,7 @@ fi
 
 echo ""
 echo "✅ ALL PRE-DEPLOYMENT CHECKS PASSED!"
-echo "Ready for: docker push kisan-ai:latest"
+echo "Ready for: docker push dhanyada:latest"
 ```
 
 **Run Pre-Deployment Tests**:
@@ -610,7 +610,7 @@ jobs:
         run: |
           pytest src/tests/ -v --cov=src
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost/kisan_ai_test
+          DATABASE_URL: postgresql://postgres:postgres@localhost/dhanyada_test
           REDIS_URL: redis://localhost:6379
       
       - name: Upload coverage
@@ -642,7 +642,7 @@ pytest src/tests/ --cov=src --cov-report=term-missing
 locust -f loadtest.py -u 500 -r 50 -t 30m --headless
 
 # Wednesday: Database integrity check
-psql -d kisan_ai -c "
+psql -d dhanyada -c "
 SELECT COUNT(*) FROM farmers;
 SELECT COUNT(*) FROM price_alerts;
 SELECT COUNT(*) FROM conversations;
@@ -663,8 +663,8 @@ safety check --json > security_report.json
 pip-audit
 
 # Database backup test
-pg_dump -d kisan_ai -f backup_test.sql
-psql -d kisan_ai_test < backup_test.sql
+pg_dump -d dhanyada -f backup_test.sql
+psql -d dhanyada_test < backup_test.sql
 ```
 
 ---
@@ -687,7 +687,7 @@ psql -c "SELECT 1"  # Should return: 1
 
 # 3. Check DATABASE_URL in .env
 echo $DATABASE_URL
-# Should be: postgresql+asyncpg://user:password@localhost/kisan_ai
+# Should be: postgresql+asyncpg://user:password@localhost/dhanyada
 ```
 
 **Issue 2: "ModuleNotFoundError: No module named 'pytest_asyncio'"**

@@ -94,7 +94,7 @@ Allow: Repository access
 ```
 Click: "New Project"
 Select: "GitHub Repo"
-Choose: kisan-ai repository
+Choose: dhanyada repository
 Select: main branch
 ```
 
@@ -120,7 +120,7 @@ Wait: ~30 seconds (cache created)
 ```
 Click: "Add Service"
 Click: "GitHub Repo"
-Select: kisan-ai repository
+Select: dhanyada repository
 Select: main branch
 Railway auto-detects Dockerfile ✅
 ```

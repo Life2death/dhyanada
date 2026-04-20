@@ -1,4 +1,4 @@
-# 🚀 How to Start & Test Your Kisan AI WhatsApp Bot
+# 🚀 How to Start & Test Your Dhanyada WhatsApp Bot
 
 **Phase 1 MVP Complete** — All 11 modules implemented, 216 tests passing, ready for field testing with farmers.
 
@@ -16,7 +16,7 @@
 ## 🔧 Step 1: Install Dependencies
 
 ```bash
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 pip install -r requirements.txt
 ```
 
@@ -34,7 +34,7 @@ This installs:
 ## 🐳 Step 2: Start Database Services
 
 ```bash
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 docker-compose up -d
 ```
 
@@ -44,8 +44,8 @@ docker-compose ps
 ```
 
 Should show:
-- `kisan_ai_postgres` — Up (healthy)
-- `kisan_ai_redis` — Up (healthy)
+- `dhanyada_postgres` — Up (healthy)
+- `dhanyada_redis` — Up (healthy)
 
 ---
 
@@ -73,7 +73,7 @@ Expected: **216 tests passing** (including 20 DPDPA consent tests).
 
 **Terminal 1 — API Server**:
 ```bash
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
@@ -90,7 +90,7 @@ INFO:     Uvicorn running on http://0.0.0.0:8000
 
 **Terminal 2 — Celery Scheduler**:
 ```bash
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 celery -A src.scheduler.celery_app beat -l info
 ```
 
@@ -112,7 +112,7 @@ celery -A src.scheduler.celery_app worker -l info
 3. Click **Edit** next to "Webhook URL"
 4. Set:
    - **Webhook URL**: `https://YOUR_DOMAIN:8000/webhook/whatsapp`
-   - **Verify Token**: `kisan_webhook_token`
+   - **Verify Token**: `dhanyada_webhook_token`
    - **Subscribe to webhook fields**: `messages`, `message_status`
 5. Click **Verify and Save**
 

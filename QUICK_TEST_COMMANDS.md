@@ -136,9 +136,9 @@ pytest src/tests/test_threshold_parser.py::TestExtractCondition::test_greater_th
 pip install pytest pytest-asyncio
 
 # Issue: "ModuleNotFoundError: No module named 'src'"
-# Make sure you're in /c/Users/vikra/projects/kisan-ai directory
-cd /c/Users/vikra/projects/kisan-ai
-pwd  # Verify you're in kisan-ai folder
+# Make sure you're in /c/Users/vikra/projects/dhanyada directory
+cd /c/Users/vikra/projects/dhanyada
+pwd  # Verify you're in dhanyada folder
 
 # Issue: "Database connection refused"
 # PostgreSQL required for some tests
@@ -153,7 +153,7 @@ redis-cli ping  # Check Redis (should show PONG)
 ### Start All Services
 ```bash
 # Terminal 1: PostgreSQL & create DB
-createdb kisan_ai
+createdb dhanyada
 alembic upgrade head
 
 # Terminal 2: Redis

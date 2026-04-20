@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     whatsapp_app_id: str = ""
 
     # Database
-    database_url: str = "postgresql+asyncpg://kisan:password@localhost:5432/kisanai"
+    database_url: str = "postgresql+asyncpg://dhanyada:password@localhost:5432/dhanyada"
     redis_url: str = "redis://localhost:6379/0"
 
     # LLM fallback

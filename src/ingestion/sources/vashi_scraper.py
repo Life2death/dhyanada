@@ -34,7 +34,7 @@ _UPSTREAM_URLS = (
     "https://www.mahaapmc.com/Report/DailyReport",
     "http://apmc.in/Report/Vashi",
 )
-_UA = "KisanAI/0.1 (+https://github.com/Life2death/kisan-ai)"
+_UA = "Dhanyada/0.1 (+https://github.com/Life2death/dhanyada)"
 
 
 def _to_decimal(value: Any) -> Optional[Decimal]:

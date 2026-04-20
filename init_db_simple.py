@@ -9,7 +9,7 @@ import sqlite3
 
 def init_db_simple():
     """Create essential tables in SQLite"""
-    db_path = "./kisan_ai.db"
+    db_path = "./dhanyada.db"
 
     print(f"Initializing SQLite database: {db_path}")
 

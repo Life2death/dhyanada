@@ -8,18 +8,18 @@
 
 ### Current Location on Your Computer
 ```
-C:\Users\vikra\projects\kisan-ai\  ← YOU ARE HERE
+C:\Users\vikra\projects\dhanyada\  ← YOU ARE HERE
 ```
 
 ### Verify You're in Right Folder
 ```bash
 # Open PowerShell or CMD and check:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 pwd
 # Expected output:
 # Path
 # ----
-# C:\Users\vikra\projects\kisan-ai
+# C:\Users\vikra\projects\dhanyada
 ```
 
 ---
@@ -65,11 +65,11 @@ pwd
 
 ```bash
 # Type this in EACH new terminal you open:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 
 # Verify you're there:
 pwd
-# Expected: C:\Users\vikra\projects\kisan-ai
+# Expected: C:\Users\vikra\projects\dhanyada
 
 dir  # List files to verify
 # You should see: src/, tests/, .env, README.md, etc.
@@ -78,10 +78,10 @@ dir  # List files to verify
 **Visual**:
 ```
 ┌─ PowerShell ─────────────────────────┐
-│ PS C:\Users\vikra> cd C:\Users\vikra\projects\kisan-ai
-│ PS C:\Users\vikra\projects\kisan-ai> pwd
-│ C:\Users\vikra\projects\kisan-ai
-│ PS C:\Users\vikra\projects\kisan-ai>                    
+│ PS C:\Users\vikra> cd C:\Users\vikra\projects\dhanyada
+│ PS C:\Users\vikra\projects\dhanyada> pwd
+│ C:\Users\vikra\projects\dhanyada
+│ PS C:\Users\vikra\projects\dhanyada>                    
 └───────────────────────────────────────┘
                 ✅ Ready!
 ```
@@ -116,7 +116,7 @@ Tip: Arrange using Windows Snap
 
 ```bash
 # Make sure you're in right directory first:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 
 # Then run:
 uvicorn src.main:app --reload
@@ -130,7 +130,7 @@ uvicorn src.main:app --reload
 **Visual - Before Running**:
 ```
 ┌─ Terminal 1 (FastAPI) ────────────────────────────────┐
-│ PS C:\Users\vikra\projects\kisan-ai> uvicorn src.main:app --reload
+│ PS C:\Users\vikra\projects\dhanyada> uvicorn src.main:app --reload
 │ (waiting...)
 │
 │
@@ -142,7 +142,7 @@ uvicorn src.main:app --reload
 **Visual - After Running**:
 ```
 ┌─ Terminal 1 (FastAPI) ────────────────────────────────┐
-│ PS C:\Users\vikra\projects\kisan-ai> uvicorn src.main:app --reload
+│ PS C:\Users\vikra\projects\dhanyada> uvicorn src.main:app --reload
 │ INFO:     Uvicorn running on http://0.0.0.0:8000
 │ INFO:     Application startup complete
 │ (cursor blinking - keeps running)
@@ -171,7 +171,7 @@ uvicorn src.main:app --reload
 
 ```bash
 # 1. Navigate to project directory (same as Terminal 1)
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 
 # 2. Start ngrok
 ngrok http 8000
@@ -187,7 +187,7 @@ ngrok http 8000
 **Visual - Before Running**:
 ```
 ┌─ Terminal 2 (ngrok) ──────────────────────────────────┐
-│ PS C:\Users\vikra\projects\kisan-ai> ngrok http 8000
+│ PS C:\Users\vikra\projects\dhanyada> ngrok http 8000
 │ (waiting...)
 │
 │
@@ -199,7 +199,7 @@ ngrok http 8000
 **Visual - After Running**:
 ```
 ┌─ Terminal 2 (ngrok) ──────────────────────────────────┐
-│ PS C:\Users\vikra\projects\kisan-ai> ngrok http 8000
+│ PS C:\Users\vikra\projects\dhanyada> ngrok http 8000
 │
 │ Session Status                online
 │ Account                       free (Plan: Free)
@@ -302,7 +302,7 @@ start http://localhost:4040
 # In Terminal 1, 2, or 3 (doesn't matter), open .env:
 # Windows: Open in Notepad
 
-# Navigate to: C:\Users\vikra\projects\kisan-ai
+# Navigate to: C:\Users\vikra\projects\dhanyada
 # Find file: .env
 # Double-click to open in Notepad
 
@@ -401,7 +401,7 @@ WHATSAPP_VERIFY_TOKEN=my_secret_123
 │ You: कांदा किंमत?                                     │
 │ [Sent 10:30 AM]                                       │
 │                                                        │
-│ Kisan AI: 🌾 कांदा - पुणे मंडी               [10:30 AM]
+│ Dhanyada: 🌾 कांदा - पुणे मंडी               [10:30 AM]
 │           💹 भाव: ₹4,200 - ₹4,500                    │
 │           📊 आजचा दर: ₹4,350                          │
 │           🏪 मंडी: पुणे (Agmarknet)                    │
@@ -456,13 +456,13 @@ INFO: Response sent
 
 ```
 TERMINAL 1 (FastAPI):
-☐ Navigate to: C:\Users\vikra\projects\kisan-ai
+☐ Navigate to: C:\Users\vikra\projects\dhanyada
 ☐ Run: uvicorn src.main:app --reload
 ☐ See: "Application startup complete"
 ☐ Keep terminal OPEN and running
 
 TERMINAL 2 (ngrok):
-☐ Navigate to: C:\Users\vikra\projects\kisan-ai
+☐ Navigate to: C:\Users\vikra\projects\dhanyada
 ☐ Run: ngrok http 8000
 ☐ See: "Forwarding https://xxxxx.ngrok.io"
 ☐ Copy the https:// URL
@@ -499,10 +499,10 @@ WHATSAPP APP (On Your Phone):
 C:\Users\vikra>
 
 # You need:
-C:\Users\vikra\projects\kisan-ai>
+C:\Users\vikra\projects\dhanyada>
 
 # Fix it:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 pwd  # Verify
 ```
 
@@ -635,14 +635,14 @@ ngrok --version
 ```bash
 # 1. Open PowerShell
 # 2. Run:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 
 # 3. Then in SAME Terminal:
 uvicorn src.main:app --reload
 
 # 4. Open ANOTHER PowerShell
 # 5. Run:
-cd C:\Users\vikra\projects\kisan-ai
+cd C:\Users\vikra\projects\dhanyada
 ngrok http 8000
 
 # 6. Look for: https://xxxxx.ngrok.io
@@ -675,5 +675,5 @@ curl https://localhost:4040
 
 **Status**: ✅ Ready to execute!  
 **Time**: 5 minutes to live bot  
-**Location**: C:\Users\vikra\projects\kisan-ai  
+**Location**: C:\Users\vikra\projects\dhanyada  
 **Next**: Follow checkboxes above and send first message!

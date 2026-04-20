@@ -1,4 +1,4 @@
-# Production Deployment Checklist — Kisan AI
+# Production Deployment Checklist — Dhanyada
 
 Complete this checklist before deploying to production.
 
@@ -48,13 +48,13 @@ Complete this checklist before deploying to production.
 
 - [ ] **Docker image builds successfully**
   ```bash
-  docker build -t kisan-ai:latest .
+  docker build -t dhanyada:latest .
   # No errors, warnings reviewed
   ```
 
 - [ ] **Image size is optimized**
   ```bash
-  docker image ls kisan-ai
+  docker image ls dhanyada
   # Expected: ~200MB (multi-stage build)
   # Alert if > 400MB
   ```
@@ -64,20 +64,20 @@ Complete this checklist before deploying to production.
   docker run -p 8000:8000 \
     -e DATABASE_URL="sqlite:///./test.db" \
     -e REDIS_URL="redis://redis:6379" \
-    kisan-ai:latest
+    dhanyada:latest
   curl http://localhost:8000/health
   # Expected: 200 OK response
   ```
 
 - [ ] **Non-root user inside container**
   ```bash
-  docker run kisan-ai:latest id
+  docker run dhanyada:latest id
   # Expected: uid=1000 (appuser), not uid=0 (root)
   ```
 
 - [ ] **Health check endpoint works**
   ```bash
-  docker run -p 8000:8000 kisan-ai:latest &
+  docker run -p 8000:8000 dhanyada:latest &
   sleep 5
   curl http://localhost:8000/health
   # Expected: {"status": "ok", "services": {...}}
@@ -94,7 +94,7 @@ Complete this checklist before deploying to production.
 
 - [ ] **PostgreSQL service is healthy**
   ```bash
-  docker-compose exec postgres pg_isready -U kisan
+  docker-compose exec postgres pg_isready-U dhanyada
   # Expected: accepting connections
   ```
 
@@ -230,13 +230,13 @@ Complete this checklist before deploying to production.
 
 - [ ] **PostgreSQL database created**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT version();"
+  docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT version();"
   # Expected: PostgreSQL 16 version string
   ```
 
 - [ ] **Database user has correct permissions**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai -c "GRANT ALL ON SCHEMA public TO kisan;"
+  docker-compose exec postgres psql -U dhanyada -d dhanyada -c "GRANT ALL ON SCHEMA public TO dhanyada;"
   ```
 
 - [ ] **Migrations have run**
@@ -247,14 +247,14 @@ Complete this checklist before deploying to production.
 
 - [ ] **Tables created successfully**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname='public';"
+  docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT COUNT(*) FROM pg_tables WHERE schemaname='public';"
   # Expected: number > 5 (multiple tables created)
   ```
 
 - [ ] **Backup script created and tested**
   ```bash
   sudo /app/backup.sh
-  ls -la /backups/kisan-ai/
+  ls -la /backups/dhanyada/
   # Expected: recent dump file
   ```
 
@@ -426,7 +426,7 @@ Complete this checklist before deploying to production.
 
 - [ ] **Database stores messages**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai \
+  docker-compose exec postgres psql -U dhanyada -d dhanyada \
     -c "SELECT COUNT(*) FROM message_table;"
   # Expected: number > 0 (messages recorded)
   ```
@@ -449,7 +449,7 @@ Complete this checklist before deploying to production.
 
 - [ ] **Database query performance is acceptable**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai \
+  docker-compose exec postgres psql -U dhanyada -d dhanyada \
     -c "SELECT COUNT(*) FROM error_log; SELECT COUNT(*) FROM message_table;"
   # Expected: queries complete quickly (< 1 second)
   ```
@@ -523,14 +523,14 @@ Complete this checklist before deploying to production.
 
 - [ ] **Error logs are persisted**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai \
+  docker-compose exec postgres psql -U dhanyada -d dhanyada \
     -c "SELECT COUNT(*) FROM error_log;"
   # Expected: > 0 (errors captured)
   ```
 
 - [ ] **Service health is being tracked**
   ```bash
-  docker-compose exec postgres psql -U kisan -d kisan_ai \
+  docker-compose exec postgres psql -U dhanyada -d dhanyada \
     -c "SELECT * FROM service_health LIMIT 1;"
   # Expected: service health record
   ```
@@ -606,7 +606,7 @@ Complete this checklist before deploying to production.
 - [ ] **Verify backup is working**
   ```bash
   /app/backup.sh
-  ls -la /backups/kisan-ai/
+  ls -la /backups/dhanyada/
   # Expected: recent backup file exists
   ```
 
@@ -705,8 +705,8 @@ docker-compose down
 git checkout HEAD~1
 
 # 3. Restore database from backup (if needed)
-docker-compose exec -T postgres pg_restore -U kisan -d kisan_ai \
-  < /backups/kisan-ai/db_YYYYMMDD_HHMMSS.dump
+docker-compose exec -T postgres pg_restore -U dhanyada -d dhanyada \
+  < /backups/dhanyada/db_YYYYMMDD_HHMMSS.dump
 
 # 4. Start previous version
 docker-compose pull

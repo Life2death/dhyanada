@@ -1,172 +1,81 @@
-# Kisan AI Roadmap
+# Dhanyada Roadmap — 2026 & Beyond
 
-**Making real-time market intelligence available to every Maharashtra farmer — directly on WhatsApp.**
-
-**Kisan AI** is a production-grade WhatsApp chatbot that delivers live mandi prices, weather advisories, pest diagnosis, government schemes, and more — in **Marathi + English** — to small and marginal farmers who only use WhatsApp.
-
-### Vision
-To become the **ultimate killer app for Maharashtra farmers** — the single WhatsApp contact they open every morning for:
-- Accurate, multi-source mandi prices
-- Voice + photo-based advice
-- Daily proactive alerts
-- Life-changing government scheme & insurance information
-- Simple profit/loss tracking
-
-No apps to download. No English needed. Zero cost for farmers.
+## Current Release (Phase 4 Step 3)
+✅ **Predictive Advisory Engine** — Weather-driven crop alerts, disease risk forecasting, irrigation guidance, WhatsApp-native delivery
 
 ---
 
-## Current State (v1.0 — Phase 1 MVP Complete — April 17, 2026)
+## Upcoming Features (Priority Order)
 
-**✅ All 11 Modules Complete**
-- Module 1: WhatsApp Cloud API wrapper (`pywa` v4.0.0)
-- Module 2: FastAPI webhook skeleton
-- Module 3: Docker Compose (PostgreSQL 16 + Redis 7)
-- Module 4: Multi-source mandi price ingestion pipeline  
-  → Agmarknet API + MSAMB scraper + NHRDF (onion) + Vashi APMC direct feed
-- Module 5: Intent classifier (Regex-first + Gemini 1.5 Flash fallback) with full Marathi Devanagari support
-- **Module 6**: Onboarding state machine (name, district, crops, consent) ✅
-- **Module 7**: Price handler + formatted WhatsApp replies ✅
-- **Module 8**: Celery + daily 6:30 AM IST price broadcast scheduler ✅
-- **Module 9**: Marathi templates + Hinglish ↔ Marathi transliteration ✅
-- **Module 10**: Admin dashboard (real-time metrics: DAU, crops, funnel, broadcasts) ✅
-- **Module 11**: DPDPA consent flow + right-to-erasure + audit logging ✅
+### Phase 4 Step 4 — Market Integration & e-NAM (Q2 2026)
+**Connect your solution to the e-NAM (National Agriculture Market) API and private procurement APIs**
 
-**✅ Infrastructure & Quality**
-- Full Docker + docker-compose setup
-- Alembic migrations (0003: DPDPA fields)
-- **216 passing tests** (73 → 196 → 216)
-- Strict git workflow + conventional commits
-- DPDPA v2023 compliant (right to be forgotten with 30-day notice)
+- **e-NAM Integration**
+  - Live access to all 1,000+ e-NAM mandis across India
+  - Real-time price discovery beyond Maharashtra APMC
+  - Backward auction & forward auction deal visibility
+  - Direct farmer-buyer price transparency
+  - API: `https://api.enam.gov.in/` (government free access)
 
-**Current Capabilities — Phase 1 MVP Ready for Production**
-- ✅ Receives WhatsApp messages in Marathi/English/Hinglish
-- ✅ Detects intent automatically (regex + LLM fallback)
-- ✅ Ingests and stores live prices from 4 authoritative sources
-- ✅ Farmer onboarding flow (name, district, crops, language preference)
-- ✅ Explicit opt-in consent collection (tracked in audit trail)
-- ✅ Farmer-specific price queries (fallback to registered district)
-- ✅ Daily 6:30 AM IST broadcast to all active farmers
-- ✅ Admin dashboard with real-time metrics
-- ✅ Right-to-erasure (30-day countdown + hard-delete)
-- ✅ Consent event audit trail (immutable)
-- ✅ Soft-delete pattern for privacy compliance
+- **Private Procurement APIs**
+  - BigBasket farmer procurement
+  - Reliance Retail direct sourcing
+  - ITC eChoupal integration
+  - Agribusiness buyer connections
 
-**Repo Status**: **Phase 1 MVP Complete. Ready for field testing with 1,000+ farmers.**
+- **Features**
+  - Price comparison: APMC vs e-NAM vs private buyers
+  - Proactive alerts when external prices are 20%+ higher
+  - Deal matching: Connect farmers to buyers directly
+
+- **Impact**: Farmers get 20-30% better prices by bypassing middlemen
 
 ---
 
-## Phase 1: MVP — "Daily Mandi Rates Bot" (✅ COMPLETE — 11/11 modules — April 17, 2026)
-
-**Goal**: Make the bot **actually useful** for 1,000+ farmers. ✅ **ACHIEVED**
-
-**All Modules Complete**
-- ✅ Module 1–5: Core infrastructure (WhatsApp, webhook, Docker, ingestion, classifier)
-- ✅ Module 6: Onboarding state machine (name, district, crops, consent)
-- ✅ Module 7: Price handler + formatted WhatsApp replies
-- ✅ Module 8: Celery + daily 6:30 AM IST price broadcast scheduler
-- ✅ Module 9: Marathi templates + Hinglish ↔ Marathi transliteration
-- ✅ Module 10: Admin dashboard (real-time metrics)
-- ✅ Module 11: Full DPDPA consent flow + audit logging + right-to-erasure + 30-day hard delete
-
-**Phase 1 Success Metrics — ALL ACHIEVED**
-- ✅ Farmers can onboard via WhatsApp (multilingual: Marathi/English/Hinglish)
-- ✅ Receive daily price broadcasts at 6:30 AM IST (6:30 AM every morning)
-- ✅ Query specific commodity prices ("कांदा दर पुणे" → ₹2500 at Lasalgaon APMC)
-- ✅ 100% DPDPA v2023 compliant (opt-in consent + right to be forgotten + 30-day notice + audit trail)
-- ✅ 216 passing tests covering all flows (consent, erasure, soft-delete, broadcasts, pricing)
-
-**Ready for**: Beta field testing with 100–1,000 farmers in Maharashtra
+### Phase 4 Step 5 — Soil & Irrigation IoT (Q3 2026)
+- Soil moisture sensors (wireless, ₹500/unit)
+- Drip irrigation automation recommendations
+- Water stress prediction (proactive not reactive)
 
 ---
 
-## Phase 2: Smart Farmer Assistant (In Progress — Modules 1-2 Complete, 3-6 Pending)
-
-**Goal**: Turn the bot into a **daily companion**.
-
-### Phase 2 Module 1: Weather Integration (✅ COMPLETE — April 17, 2026)
-
-**Status**: 100% complete
-- ✅ Multi-source ingestion (IMD API + OpenWeather fallback)
-- ✅ Intent classification (WEATHER_QUERY + regex patterns)
-- ✅ Webhook routing + admin metrics
-- ✅ 20+ tests passing
-
-### Phase 2 Module 2: Voice Message Support (✅ COMPLETE — April 18, 2026)
-
-**Status**: 100% complete — Production-ready voice transcription
-- ✅ Speech-to-Text (Google Cloud Speech-to-Text primary, Whisper fallback)
-- ✅ Marathi language support (mr-IN, 95% accuracy)
-- ✅ Automatic transcription → intent classification → existing handlers
-- ✅ Webhook audio message handling (media URL fetching, 24h audit trail)
-- ✅ 40+ comprehensive tests
-- ✅ Graceful error handling + fallback messages
-
-### Phase 2 Module 3: Image-based Pest & Disease Diagnosis (✅ COMPLETE — April 18, 2026)
-
-**Status**: 100% complete — Production-ready hybrid diagnosis
-- ✅ Local TensorFlow model (top 20 Maharashtra crop pests) + Gemini Vision fallback
-- ✅ Image download from Meta WhatsApp URLs (24h media URL expiry)
-- ✅ Structured DiagnosisResult (pest name, Marathi translation, confidence, severity)
-- ✅ Treatment recommendations in Marathi via formatted replies
-- ✅ Webhook image message handling (media URL fetching, pest diagnosis routing)
-- ✅ DiagnosisHandler + DiagnosisRepository for persistence & analytics
-- ✅ 25+ comprehensive tests (download, TensorFlow, Gemini, fallback, formatting)
-- ✅ Graceful error handling (missing model → Gemini-only mode)
-- ✅ Severity determination from confidence (mild < 0.7, moderate < 0.9, severe ≥ 0.9)
-
-**Remaining Phase 2 Modules**:
-- Module 4: Government schemes & MSP alerts (PM-KISAN, crop insurance, subsidies)
-- Module 5: Price alerts ("notify me when onion > ₹5000")
-- Module 6: Conversation memory (Redis-based last 10 messages)
+### Phase 4 Step 6 — Scheme Automation (Q3 2026)
+- Auto-fill PM-KISAN forms from Dhanyada profile
+- Subsidy disbursement tracking
+- Integration with state treasury systems
 
 ---
 
-## Phase 3: Ultimate Killer for Farmers (Target: Aug–Oct 2026)
-
-**This is where we become unbeatable.**
-
-- Historical price charts (send as image)
-- Simple bookkeeping & profit/loss tracker  
-  ("Sold 10 quintal onion for 45000" → monthly summary)
-- Climate-resilient advisory + district-specific recommendations
-- Buyer matching / direct FPO connect (optional)
-- Loan & insurance eligibility checker
-- Video knowledge base (YouTube → summarized advice)
-- Multi-language expansion (full Hinglish + Hindi)
-
-**Differentiators vs every other agri-bot**
-- Live multi-source prices (others use static data)
-- Voice + photo native
-- Hybrid (fast local + LLM) intelligence
-- Fully production-grade (Docker, Postgres, Redis, Celery, DPDPA)
-- Built for Maharashtra first, then scalable to all India
+### Phase 4 Step 7 — Farmer Cooperative Networking (Q4 2026)
+- Bulk buying power for inputs
+- Collective marketing to buyers
+- Risk pooling for insurance
 
 ---
 
-## Phase 4: Scale, Monetization & Impact (Q4 2026 onward)
-
-- Cloud migration (AWS/Hetzner Mumbai)
-- FPO & B2B2C partnerships (₹5k–15k/month per FPO)
-- Premium tier (advanced alerts + analytics)
-- Open analytics dashboard for farmers
-- Community contributions & state expansion
-- Potential social impact funding / government pilot
+### Phase 5 — Outcome Feedback Loop (2027+)
+- Farmer ratings: "Was this advisory helpful?"
+- A/B test rules for accuracy improvement
+- Transition from rule-based to learned ML models
 
 ---
 
-## How You Can Contribute
-
-We follow a strict but simple process (see `AGENTS.md`):
-1. One module at a time
-2. License check + thin adapter pattern
-3. Tests + documentation
-4. Conventional commit + push to `main`
-
-Want to help? Pick any open item from the current Phase and comment on an issue (we'll create them soon).
+### Phase 6 — Pan-India Expansion (2027+)
+- 22 scheduled Indian languages via Bhashini
+- Regional crop-specific rules
+- Full voice interface (no text needed)
 
 ---
 
-**Let's build the most useful WhatsApp tool ever made for Indian farmers.**
+## Success Metrics
 
-— Life2death
+| Phase | Metric | Target |
+|---|---|---|
+| **4.3** (Advisory) | Farmers reached | 100K by Q2 2026 |
+| **4.4** (e-NAM) | Better prices | 15% improvement |
+| **Phase 5** (ML) | Accuracy | 90%+ disease/weather |
+| **Phase 6** (Pan-India) | Total farmers | 10M by 2028 |
+
+---
+
+Last updated: April 2026 | Maintained by: Vikram Panmand

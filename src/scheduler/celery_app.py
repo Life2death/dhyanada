@@ -2,7 +2,7 @@
 from celery import Celery
 from celery.schedules import crontab
 
-app = Celery("kisan_ai")
+app = Celery("dhanyada")
 
 # Load config from settings
 app.conf.update(

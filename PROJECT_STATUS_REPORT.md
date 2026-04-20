@@ -1,4 +1,4 @@
-# Kisan AI — Project Status Report (2026-04-18)
+# Dhanyada — Project Status Report (2026-04-18)
 
 ## Executive Summary
 
@@ -660,7 +660,7 @@ Cost: $25-50/month
 ```bash
 # Click "New Project"
 # Select "GitHub Repo"
-# Choose kisan-ai repository
+# Choose dhanyada repository
 # Click "Create"
 ```
 
@@ -735,7 +735,7 @@ Cost: $25-50/month
 
 ```bash
 # Database
-DATABASE_URL=postgresql://user:pass@host:5432/kisan_ai
+DATABASE_URL=postgresql://user:pass@host:5432/dhanyada
 REDIS_URL=redis://host:6379
 
 # WhatsApp

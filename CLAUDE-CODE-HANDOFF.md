@@ -1,14 +1,14 @@
-# Maharashtra Kisan AI — Claude Code Handoff Document
+# Dhanyada — Claude Code Handoff Document
 
 **Last updated**: 2026-04-18 — Phase 2 Module 3 (Pest Diagnosis) complete  
-**GitHub**: https://github.com/Life2death/kisan-ai  
+**GitHub**: https://github.com/Life2death/dhanyada  
 **Owner**: Vikram Panmand (vikram.panmand@gmail.com)
 
 ---
 
 ## 1. Project Overview
 
-Maharashtra Kisan AI is a WhatsApp chatbot that helps smallholder farmers in Maharashtra get real-time mandi (market) prices, MSP alerts, and daily price broadcasts — all via WhatsApp in **Marathi and English**.
+Dhanyada is a WhatsApp chatbot that helps smallholder farmers in Maharashtra get real-time mandi (market) prices, MSP alerts, and daily price broadcasts — all via WhatsApp in **Marathi and English**.
 
 | Field | Value |
 |-------|-------|
@@ -38,9 +38,9 @@ Maharashtra Kisan AI is a WhatsApp chatbot that helps smallholder farmers in Mah
 
 ### Module 3 — Docker Compose (Postgres 16 + Redis 7) ✅
 - **File**: `docker-compose.yml`
-- PostgreSQL 16-alpine: user=kisan, db=kisan_ai, port 5432, named volume `postgres_data`
+- PostgreSQL 16-alpine: user=dhanyada, db=dhanyada, port 5432, named volume `postgres_data`
 - Redis 7-alpine: appendonly=yes, port 6379, named volume `redis_data`
-- Health checks, `kisan_network` bridge, UTF-8 initdb args
+- Health checks, `dhanyada_network` bridge, UTF-8 initdb args
 - **Decision log**: `vendor-research/02-docker-compose.md`
 
 ### Module 4 — Mandi Price Ingestion (4-source pipeline) ✅
@@ -358,8 +358,8 @@ python -m pytest src/tests/ -v
 ## 5. Project Structure (current)
 
 ```
-kisan-ai/
-├── AGENTS.md                      # OpenClaw instructions
+dhanyada/
+├── AGENTS.md                      # Claude Code instructions
 ├── DECISIONS.md                   # Architecture decision log (append-only)
 ├── CLAUDE-CODE-HANDOFF.md         # This file
 ├── docker-compose.yml             # Postgres 16 + Redis 7
@@ -436,10 +436,10 @@ kisan-ai/
 WHATSAPP_PHONE_ID=1135216599663873
 WHATSAPP_BUSINESS_ACCOUNT_ID=1888194241890478
 WHATSAPP_TOKEN=<permanent token in .env>
-WHATSAPP_VERIFY_TOKEN=kisan_webhook_token
+WHATSAPP_VERIFY_TOKEN=dhanyada_webhook_token
 
 # Database
-DATABASE_URL=postgresql://kisan:kisan_secure_dev_password@localhost:5432/kisan_ai
+DATABASE_URL=postgresql://dhanyada:dhanyada_secure_dev_password@localhost:5432/dhanyada
 REDIS_URL=redis://localhost:6379
 
 # FastAPI

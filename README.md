@@ -1,4 +1,4 @@
-# Kisan AI 🌾
+# Dhanyada — Giver of Grains 🌾
 
 **A WhatsApp-based farming bot for Maharashtra farmers** providing real-time market prices, government scheme eligibility, pest diagnosis, and alert subscriptions.
 
@@ -18,8 +18,8 @@
 
 ```bash
 # Clone & install
-git clone https://github.com/your-org/kisan-ai
-cd kisan-ai
+git clone https://github.com/your-org/dhanyada
+cd dhanyada
 pip install -r requirements.txt
 
 # Setup database
@@ -209,7 +209,7 @@ See `PHASE3_PROGRESS.md` for deployment timeline.
 **"Database connection refused"**
 ```bash
 # Check PostgreSQL is running
-psql -U postgres -d kisan_ai -c "SELECT 1"
+psql -U postgres -d dhanyada -c "SELECT 1"
 ```
 
 **"Celery task not running"**
@@ -229,10 +229,10 @@ celery -A src.scheduler.celery_app inspect active
 ### Get Logs
 ```bash
 # View recent logs
-tail -f /var/log/kisan-ai/app.log
+tail -f /var/log/dhanyada/app.log
 
 # Search for errors
-grep "ERROR" /var/log/kisan-ai/app.log
+grep "ERROR" /var/log/dhanyada/app.log
 ```
 
 ---
@@ -284,7 +284,7 @@ Proprietary - Kisan AI Foundation
 
 ## Contact
 
-- **Support**: support@kisanai.com
+- **Support**: support@dhanyada.com
 - **Issues**: GitHub Issues
 - **Team**: [Team members]
 

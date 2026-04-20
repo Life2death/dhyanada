@@ -36,7 +36,7 @@ from src.ingestion.sources.base import PriceRecord, PriceSource
 logger = logging.getLogger(__name__)
 
 _REPORT_URL = "https://www.msamb.com/ApmcDetail/ArrivalPriceReport"
-_UA = "KisanAI/0.1 (+https://github.com/Life2death/kisan-ai) mandi-price-bot"
+_UA = "Dhanyada/0.1 (+https://github.com/Life2death/dhanyada) mandi-price-bot"
 _POLITE_DELAY_S = 2.0
 
 

@@ -6,7 +6,7 @@
 
 ```bash
 # 1. Start the server
-cd /c/Users/vikra/projects/kisan-ai
+cd /c/Users/vikra/projects/dhanyada
 uvicorn src.main:app --reload
 
 # 2. Test admin dashboard
@@ -43,7 +43,7 @@ git push origin main
 ```
 1. Click "New Project"
 2. Select "GitHub Repo"
-3. Choose kisan-ai
+3. Choose dhanyada
 4. Select main branch
 ```
 
@@ -57,7 +57,7 @@ git push origin main
 **Step 5: Add Docker App (3 min)**
 ```
 1. Click "Add Service" → GitHub Repo
-2. Select kisan-ai repository
+2. Select dhanyada repository
 3. Railway detects Dockerfile ✅
 ```
 

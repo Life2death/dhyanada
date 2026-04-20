@@ -1,6 +1,6 @@
 # WhatsApp Testing Guide - Send Real Messages to Your Bot
 
-**This guide shows HOW to test Kisan AI directly on WhatsApp**
+**This guide shows HOW to test Dhanyada directly on WhatsApp**
 
 ---
 
@@ -21,7 +21,7 @@
 2. **Meta Business Manager Access** (free)
 3. **ngrok** (free, for local testing)
 4. **Postman** (optional, for manual webhook testing)
-5. **Your Kisan AI code** (running locally)
+5. **Your Dhanyada code** (running locally)
 
 ### Time Required
 - First setup: 30-60 minutes
@@ -34,8 +34,8 @@
 ### If You Already Have WhatsApp Business Account
 
 ```bash
-# 1. Start Kisan AI locally
-cd /c/Users/vikra/projects/kisan-ai
+# 1. Start Dhanyada locally
+cd /c/Users/vikra/projects/dhanyada
 uvicorn src.main:app --reload
 
 # 2. Expose to internet with ngrok
@@ -126,11 +126,11 @@ ngrok --version
 # Expected: ngrok version 3.x.x
 ```
 
-### STEP 4: Start Your Kisan AI App
+### STEP 4: Start Your Dhanyada App
 
 **Terminal 1: Start FastAPI**
 ```bash
-cd /c/Users/vikra/projects/kisan-ai
+cd /c/Users/vikra/projects/dhanyada
 
 # Create/update .env file with WhatsApp credentials
 # (See STEP 2 above)
@@ -213,8 +213,8 @@ Expected in Terminal 1 (FastAPI logs):
 # INFO: Sending response...
 
 Expected on WhatsApp:
-# "नमस्ते! मी Kisan AI आहे. तुम्हाला काय साहाय्य करू शकते?"
-# (Hello! I'm Kisan AI. How can I help you?)
+# "नमस्ते! मी Dhanyada आहे. तुम्हाला काय साहाय्य करू शकते?"
+# (Hello! I'm Dhanyada. How can I help you?)
 ```
 
 ---
@@ -291,7 +291,7 @@ Time: ~1 second
 
 ### View Logs in Real-Time
 
-**Terminal 1: Kisan AI Logs**
+**Terminal 1: Dhanyada Logs**
 ```bash
 # Already running: uvicorn src.main:app --reload
 
@@ -516,8 +516,8 @@ STEP 3 (5 min): Install ngrok
   ├─ Extract/install
   └─ Verify: ngrok --version
 
-STEP 4 (3 min): Start Kisan AI
-  ├─ cd kisan-ai
+STEP 4 (3 min): Start Dhanyada
+  ├─ cd dhanyada
   ├─ Update .env
   └─ uvicorn src.main:app --reload
 
@@ -592,7 +592,7 @@ STEP 8 (2 min): Send real message
    Expected: All three credentials shown
 
 ✅ 5. Database setup (if needed)
-   $ psql -d kisan_ai -c "SELECT 1"
+   $ psql -d dhanyada -c "SELECT 1"
    Expected: 1 (OK if PostgreSQL running)
 
 ✅ 6. Redis (if needed)

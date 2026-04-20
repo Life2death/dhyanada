@@ -2,7 +2,7 @@
 
 ## Module 3: PostgreSQL 16 + Redis 7
 
-This guide shows how to start the database services for Kisan AI.
+This guide shows how to start the database services for Dhanyada.
 
 ---
 
@@ -23,14 +23,14 @@ This guide shows how to start the database services for Kisan AI.
 ### 1. Start PostgreSQL + Redis
 
 ```bash
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 docker-compose up -d
 ```
 
 You should see:
 ```
-Creating kisan_ai_postgres ... done
-Creating kisan_ai_redis ... done
+Creating dhanyada_postgres ... done
+Creating dhanyada_redis ... done
 ```
 
 ### 2. Check Service Status
@@ -42,8 +42,8 @@ docker-compose ps
 Expected output:
 ```
 NAME                 STATUS              PORTS
-kisan_ai_postgres    Up (healthy)        5432/tcp
-kisan_ai_redis       Up (healthy)        6379/tcp
+dhanyada_postgres    Up (healthy)        5432/tcp
+dhanyada_redis       Up (healthy)        6379/tcp
 ```
 
 ### 3. View Logs
@@ -67,11 +67,11 @@ docker-compose logs -f redis
 
 ```bash
 # Using psql (if installed)
-psql -h localhost -U kisan -d kisan_ai
-# Password: kisan_secure_dev_password
+psql -h localhost -U dhanyada -d dhanyada
+# Password: dhanyada_secure_dev_password
 
 # Or using Docker
-docker-compose exec postgres psql -U kisan -d kisan_ai
+docker-compose exec postgres psql -U dhanyada -d dhanyada
 ```
 
 Once connected, test:
@@ -112,7 +112,7 @@ import redis
 
 async def test_postgres():
     conn = await asyncpg.connect(
-        'postgresql://kisan:kisan_secure_dev_password@localhost:5432/kisan_ai'
+        'postgresql://dhanyada:dhanyada_secure_dev_password@localhost:5432/dhanyada'
     )
     version = await conn.fetchval('SELECT version()')
     print(f"✅ Postgres: {version[:50]}...")
@@ -138,7 +138,7 @@ Once services are running, initialize the database schema:
 
 ```bash
 # Run migrations
-cd ~/projects/kisan-ai
+cd ~/projects/dhanyada
 alembic upgrade head
 
 # Check migration status
@@ -193,7 +193,7 @@ netstat -an | grep 6379  # Windows: netstat -ano | findstr 6379
 
 ### Connection refused errors
 - Wait 10-15 seconds for services to start (health checks need time)
-- Check `.env` has correct credentials: `kisan_secure_dev_password`
+- Check `.env` has correct credentials: `dhanyada_secure_dev_password`
 - Verify ports are not already in use
 
 ---
@@ -209,7 +209,7 @@ netstat -an | grep 6379  # Windows: netstat -ano | findstr 6379
 ## Security Notes (Development Only)
 
 ⚠️ These settings are for **local development only**:
-- Default password: `kisan_secure_dev_password` (change in production!)
+- Default password: `dhanyada_secure_dev_password` (change in production!)
 - No authentication for Redis (add in production)
 - Port 5432/6379 exposed (firewall in production)
 
@@ -243,22 +243,22 @@ celery -A src.scheduler.celery_app worker -l info
 
 ### View Farmers
 ```bash
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT id, phone, name, district, onboarding_state FROM farmers LIMIT 5;"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT id, phone, name, district, onboarding_state FROM farmers LIMIT 5;"
 ```
 
 ### View Conversations
 ```bash
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT id, farmer_id, direction, detected_intent, raw_message FROM conversations LIMIT 10;"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT id, farmer_id, direction, detected_intent, raw_message FROM conversations LIMIT 10;"
 ```
 
 ### View Consent Events (DPDPA Audit Trail)
 ```bash
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT farmer_id, event_type, created_at FROM consent_events ORDER BY created_at DESC LIMIT 20;"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT farmer_id, event_type, created_at FROM consent_events ORDER BY created_at DESC LIMIT 20;"
 ```
 
 ### View Erasure Requests
 ```bash
-docker-compose exec postgres psql -U kisan -d kisan_ai -c "SELECT id, phone, name, erasure_requested_at FROM farmers WHERE erasure_requested_at IS NOT NULL;"
+docker-compose exec postgres psql -U dhanyada -d dhanyada -c "SELECT id, phone, name, erasure_requested_at FROM farmers WHERE erasure_requested_at IS NOT NULL;"
 ```
 
 ---

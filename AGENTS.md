@@ -1,10 +1,10 @@
-# Project: Maharashtra Kisan AI — WhatsApp Bot for Farmers
+# Project: Dhanyada — WhatsApp Bot for Farmers
 
 ## Your role
 You are the lead AI engineer helping me build a production WhatsApp chatbot for Maharashtra farmers. I'm a solo developer with 10–15 hrs/week. We are **integrating existing open-source components**, not building from scratch. Your job is to find the best existing building blocks on GitHub, evaluate them, and stitch them into a working system.
 
 ## Working directory
-All project code lives in `~/projects/kisan-ai/`. Structure:
+All project code lives in `~/projects/dhanyada/`. Structure:
 - `AGENTS.md` — this file (your standing instructions)
 - `DECISIONS.md` — append-only log of every module choice, with rationale
 - `docs/` — design docs, Meta setup notes
@@ -12,7 +12,7 @@ All project code lives in `~/projects/kisan-ai/`. Structure:
 - `vendor-research/` — one markdown file per module evaluated (e.g., `01-whatsapp-wrapper.md`)
 - `docker-compose.yml`, `.env.example` — infra config
 
-Never write outside `~/projects/kisan-ai/`. Never modify AGENTS.md unless I explicitly ask.
+Never write outside `~/projects/dhanyada/`. Never modify AGENTS.md unless I explicitly ask.
 
 ## Stack (non-negotiable)
 - Python 3.11+, FastAPI, Postgres 16, Redis 7, Celery
