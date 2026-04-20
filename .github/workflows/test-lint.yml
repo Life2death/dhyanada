@@ -1,0 +1,63 @@
+name: Test & Lint
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test-lint:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11']
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio pytest-cov black isort flake8
+
+    - name: Lint with black
+      run: |
+        black --check src/ || echo "Black formatting issues found"
+      continue-on-error: true
+
+    - name: Lint with isort
+      run: |
+        isort --check-only src/ || echo "Import sorting issues found"
+      continue-on-error: true
+
+    - name: Lint with flake8
+      run: |
+        flake8 src/ --max-line-length=120 --count --show-source --statistics || echo "Flake8 issues found"
+      continue-on-error: true
+
+    - name: Run tests with pytest
+      run: |
+        pytest src/tests/ -v --tb=short
+
+    - name: Generate coverage report
+      run: |
+        pytest src/tests/ --cov=src --cov-report=xml --cov-report=term-missing
+
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        fail_ci_if_error: false
+        verbose: true
+
+    - name: Test result summary
+      if: always()
+      run: |
+        echo "Tests completed. Check logs above for details."

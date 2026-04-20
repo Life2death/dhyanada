@@ -3,8 +3,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import String, Integer, Date, DateTime, Numeric, Boolean, Index, UniqueConstraint
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, Integer, Date, DateTime, Numeric, Boolean, Index, UniqueConstraint, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -26,8 +25,9 @@ class WeatherObservation(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     date: Mapped[date] = mapped_column(Date, nullable=False)
-    apmc: Mapped[str] = mapped_column(String(100), nullable=False)           # canonical: pune, nashik, etc.
-    district: Mapped[str] = mapped_column(String(50), nullable=False)
+    apmc: Mapped[str] = mapped_column(String(100), nullable=False)           # taluka slug (e.g. "niphad", "baramati")
+    district: Mapped[str] = mapped_column(String(50), nullable=False)        # parent district
+    taluka: Mapped[str] = mapped_column(String(100), nullable=False, default="")  # taluka name (same as apmc)
     metric: Mapped[str] = mapped_column(String(50), nullable=False)          # temperature, rainfall, humidity, wind_speed, pressure
     value: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)   # actual measurement (25.5, 40.0, 80, etc.)
     unit: Mapped[str] = mapped_column(String(20), nullable=False)            # °C, mm, %, km/h, hPa
@@ -37,7 +37,7 @@ class WeatherObservation(Base):
     condition: Mapped[Optional[str]] = mapped_column(String(50))             # Sunny, Cloudy, Rainy, etc.
     advisory: Mapped[Optional[str]] = mapped_column(String(500))             # Crop-specific advisory (e.g., pest warning)
     source: Mapped[str] = mapped_column(String(50), nullable=False)          # imd | openweather
-    raw_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)     # Original API response
+    raw_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)     # Original API response
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_stale: Mapped[bool] = mapped_column(Boolean, default=False)           # True if >6 hours old
 
@@ -46,5 +46,6 @@ class WeatherObservation(Base):
         Index("idx_weather_lookup", "date", "apmc", "forecast_days_ahead"),
         Index("idx_weather_metric", "metric", "date"),
         Index("idx_weather_district", "district", "date"),
+        Index("idx_weather_taluka", "taluka", "date"),
         Index("idx_weather_source", "source", "fetched_at"),
     )

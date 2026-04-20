@@ -1,0 +1,11 @@
+# Optional ML / Speech dependencies — NOT installed on Railway by default.
+# These power Phase 2 features (pest diagnosis, voice STT) that are not yet live.
+# To install locally:  pip install -r requirements.txt -r requirements-ml.txt
+
+# Machine Learning (Phase 2 Module 3 — pest / disease image diagnosis)
+tensorflow>=2.13.0
+scikit-image>=0.21.0
+
+# Speech-to-Text (Phase 2 Module 2 — voice messages)
+google-cloud-speech==2.23.0
+openai>=1.0.0   # Whisper fallback

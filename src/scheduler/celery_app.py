@@ -39,6 +39,12 @@ app.conf.beat_schedule = {
         # 6:30 AM IST every day (runs 30 min after weather ingestion)
         "schedule": crontab(hour=6, minute=30),
     },
+    "trigger-farm-advisories-daily": {
+        "task": "src.scheduler.tasks.trigger_farm_advisories",
+        # 6:45 AM IST every day (after weather ingest at 6:00, before price broadcast)
+        # Phase 4 Step 3
+        "schedule": crontab(hour=6, minute=45),
+    },
     "ingest-prices-daily": {
         "task": "src.scheduler.tasks.ingest_prices",
         # 8:00 PM IST every day (evening price ingestion)

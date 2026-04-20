@@ -18,10 +18,12 @@ from typing import Optional
 from dataclasses import dataclass
 
 import httpx
-from google.cloud import speech_v1
-import openai
 
 logger = logging.getLogger(__name__)
+
+# google-cloud-speech and openai are optional (requirements-ml.txt).
+# Imported lazily inside VoiceTranscriber.__init__ so the module loads cleanly
+# on production servers where these heavy packages are not installed.
 
 
 class TranscriptionError(Exception):
@@ -65,18 +67,25 @@ class VoiceTranscriber:
         self.google_api_key = config.get("google_speech_api_key", "")
         self.openai_api_key = config.get("openai_api_key", "")
 
-        # Initialize clients
-        self.google_speech_client: Optional[speech_v1.SpeechClient] = None
+        # Initialize clients (packages imported lazily — not installed in base image)
+        self.google_speech_client = None
         if self.google_api_key:
             try:
-                self.google_speech_client = speech_v1.SpeechClient()
-                logger.info("✅ Google Cloud Speech-to-Text initialized")
+                from google.cloud import speech_v1 as _speech  # noqa: PLC0415
+                self.google_speech_client = _speech.SpeechClient()
+                logger.info("Google Cloud Speech-to-Text initialized")
+            except ImportError:
+                logger.warning("google-cloud-speech not installed; Google STT unavailable")
             except Exception as e:
-                logger.error(f"❌ Google Cloud STT init failed: {e}")
+                logger.error(f"Google Cloud STT init failed: {e}")
 
         if self.openai_api_key:
-            openai.api_key = self.openai_api_key
-            logger.info("✅ OpenAI Whisper initialized")
+            try:
+                import openai as _openai  # noqa: PLC0415
+                _openai.api_key = self.openai_api_key
+                logger.info("OpenAI Whisper initialized")
+            except ImportError:
+                logger.warning("openai not installed; Whisper STT unavailable")
 
     async def transcribe(self, media_url: str) -> TranscriptionResult:
         """Download audio from Media URL and transcribe to text.
@@ -165,6 +174,7 @@ class VoiceTranscriber:
             TranscriptionError: On API error or timeout
         """
         try:
+            from google.cloud import speech_v1  # noqa: PLC0415
             # Prepare Google Cloud Speech config
             config = speech_v1.RecognitionConfig(
                 encoding=speech_v1.RecognitionConfig.AudioEncoding.OGG_OPUS,
@@ -231,8 +241,9 @@ class VoiceTranscriber:
             try:
                 # Call Whisper API in executor to avoid blocking
                 def _call_api():
+                    import openai as _openai  # noqa: PLC0415
                     with open(temp_path, "rb") as audio_file:
-                        transcript = openai.Audio.transcribe(
+                        transcript = _openai.Audio.transcribe(
                             model="whisper-1",
                             file=audio_file,
                         )

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.ingestion.weather.sources.base import WeatherRecord, WeatherSource
 from src.ingestion.weather.sources.imd_api import IMDWeatherSource
 from src.ingestion.weather.sources.openweather_api import OpenWeatherSource
+from src.ingestion.weather.sources.agromonitoring_api import AgroMonitoringSource
 from src.ingestion.weather.normalizer import normalize_metric, normalize_apmc, normalize_unit
 from src.ingestion.weather.merger import pick_winners
 from src.models.weather import WeatherObservation
@@ -174,6 +175,7 @@ async def _upsert_records(session: AsyncSession, records: Sequence[WeatherRecord
             date=rec.trade_date,
             apmc=rec.apmc,
             district=rec.district,
+            taluka=rec.taluka or rec.apmc,
             metric=rec.metric,
             value=rec.value,
             unit=rec.unit,
@@ -195,6 +197,7 @@ async def _upsert_records(session: AsyncSession, records: Sequence[WeatherRecord
                 "date": rec.date,
                 "apmc": rec.apmc,
                 "district": rec.district,
+                "taluka": rec.taluka or rec.apmc,
                 "metric": rec.metric,
                 "value": rec.value,
                 "unit": rec.unit,
@@ -234,15 +237,34 @@ async def _upsert_records(session: AsyncSession, records: Sequence[WeatherRecord
 
 
 def _default_sources() -> list[WeatherSource]:
-    """Create default list of weather sources (IMD + OpenWeather).
+    """Create default list of weather sources (AgroMonitoring > OpenWeather > IMD).
+
+    Priority order:
+    1. AgroMonitoring (agriculture-focused, best for farms)
+    2. OpenWeather (fallback, general weather)
+    3. IMD (stub, awaiting integration)
 
     Returns:
         List of WeatherSource instances ready to use
     """
     from src.config import settings
 
-    sources = [
-        IMDWeatherSource(),
-        OpenWeatherSource(api_key=settings.openweather_api_key),
-    ]
+    sources = []
+
+    # Primary: AgroMonitoring (agriculture-focused)
+    if settings.agromonitoring_api_key:
+        sources.append(AgroMonitoringSource(api_key=settings.agromonitoring_api_key))
+        logger.info("_default_sources: Added AgroMonitoring (agriculture-focused)")
+
+    # Secondary: OpenWeather (fallback)
+    if settings.openweather_api_key:
+        sources.append(OpenWeatherSource(api_key=settings.openweather_api_key))
+        logger.info("_default_sources: Added OpenWeather (fallback)")
+
+    # Tertiary: IMD (stub)
+    sources.append(IMDWeatherSource())
+
+    if not sources:
+        logger.warning("_default_sources: No weather API keys configured!")
+
     return sources

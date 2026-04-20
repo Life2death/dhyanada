@@ -17,11 +17,12 @@ class WeatherRecord:
     """
 
     trade_date: date
-    apmc: str                      # APMC code (canonical: pune, nashik, etc.)
-    district: str
+    apmc: str                      # location slug — taluka code (e.g. "niphad", "baramati")
+    district: str                  # parent district (e.g. "nashik", "pune")
     metric: str                    # temperature, rainfall, humidity, wind_speed, pressure
     value: Decimal                 # measurement value
     unit: str                      # °C, mm, %, km/h, hPa
+    taluka: str = ""               # taluka name (canonical slug, same as apmc for taluka records)
     min_value: Optional[Decimal] = None
     max_value: Optional[Decimal] = None
     forecast_days_ahead: int = 0   # 0=today, 1-7=forecast
@@ -31,10 +32,7 @@ class WeatherRecord:
     raw: Optional[dict[str, Any]] = None
 
     def dedupe_key(self) -> tuple:
-        """Return tuple that matches database unique constraint.
-
-        Used to identify duplicates from the same source.
-        """
+        """Return tuple that matches database unique constraint."""
         return (self.trade_date, self.apmc, self.metric, self.forecast_days_ahead, self.source)
 
 

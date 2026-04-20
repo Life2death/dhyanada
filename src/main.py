@@ -9,12 +9,16 @@ import logging
 import os
 from typing import Optional
 from fastapi import FastAPI, Request, HTTPException, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 import json
 
 from src.adapters.whatsapp import WhatsAppAdapter, WhatsAppConfig, init_adapter, get_adapter
+from src.admin import router as admin_router
+from src.farmer import router as farmer_router
+from src.advisory import router as advisory_router
 from src.config import settings
+from src.middleware.error_handler import ErrorLoggingMiddleware
 
 # Configure logging
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
@@ -27,15 +31,27 @@ app = FastAPI(
     version="1.0.0",
 )
 
+# Register middleware for global error logging (Phase 3 Step 3)
+app.add_middleware(ErrorLoggingMiddleware)
+
+# Mount admin dashboard routes
+app.include_router(admin_router)
+
+# Mount farmer dashboard routes (Phase 4 Step 1)
+app.include_router(farmer_router)
+
+# Mount advisory admin routes (Phase 4 Step 3)
+app.include_router(advisory_router)
+
 # Initialize WhatsApp adapter on startup
 @app.on_event("startup")
 async def startup_event():
     """Initialize WhatsApp adapter with credentials from .env"""
     try:
         config = WhatsAppConfig(
-            phone_id=os.getenv("WHATSAPP_PHONE_ID", ""),
-            token=os.getenv("WHATSAPP_TOKEN", ""),
-            business_account_id=os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID"),
+            phone_id=settings.whatsapp_phone_id,
+            token=settings.whatsapp_token,
+            business_account_id=settings.whatsapp_app_id,
         )
         adapter = init_adapter(config)
         logger.info("✅ WhatsApp adapter initialized")
@@ -62,8 +78,43 @@ class WebhookResponse(BaseModel):
 # Health check endpoint
 @app.get("/health")
 async def health():
-    """Health check endpoint"""
-    return {"status": "ok", "service": "Kisan AI Bot"}
+    """Health check endpoint with service status (Phase 3 Step 3).
+
+    Returns system health including service status from ServiceHealth table.
+    """
+    try:
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from sqlalchemy import select
+        from src.models.service_health import ServiceHealth
+
+        engine = create_async_engine(settings.database_url)
+        async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with async_session() as session:
+            # Get all service health records
+            result = await session.execute(select(ServiceHealth))
+            services = result.scalars().all()
+
+            service_status = {
+                s.service_name: {
+                    "healthy": s.is_healthy,
+                    "error_rate_1h": s.error_rate_1h,
+                    "latency_ms": s.avg_latency_ms,
+                }
+                for s in services
+            }
+
+        await engine.dispose()
+
+        return {
+            "status": "ok" if all(s["healthy"] for s in service_status.values()) else "degraded",
+            "service": "Kisan AI Bot",
+            "services": service_status,
+        }
+    except Exception as e:
+        logger.warning(f"Could not fetch service health: {e}")
+        return {"status": "ok", "service": "Kisan AI Bot", "note": "Service health unavailable"}
 
 
 # Webhook verification (Meta requires this)
@@ -79,11 +130,11 @@ async def verify_webhook(
     Meta sends a GET request to verify the webhook URL.
     We must respond with the hub_challenge if token matches.
     """
-    verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "kisan_webhook_token")
+    verify_token = settings.whatsapp_verify_token
     
     if hub_mode == "subscribe" and hub_verify_token == verify_token:
         logger.info("✅ Webhook verified by Meta")
-        return hub_challenge
+        return PlainTextResponse(hub_challenge)
     
     logger.warning(f"❌ Invalid webhook verification attempt")
     raise HTTPException(status_code=403, detail="Invalid verification token")
@@ -121,6 +172,7 @@ async def receive_message(request: Request):
 
         # Parse messages using webhook handler
         messages = parse_webhook_message(data)
+        logger.info(f"✅ Parsed {len(messages)} messages from webhook")  # DEBUG: Show if parsing works
 
         # Setup database session for handlers
         engine = create_async_engine(settings.database_url)
@@ -167,20 +219,31 @@ async def receive_message(request: Request):
 
             try:
                 # Classify intent
-                result = await handle_message(msg)
-                intent_type = Intent(result.get("intent", "unknown"))
+                result_dict = await handle_message(msg)
+                intent_type = Intent(result_dict.get("intent", "unknown"))
 
                 logger.info(
-                    f"🧠 Classified: intent={intent_type.value} confidence={result.get('confidence', 0):.2f}"
+                    f"🧠 Classified: intent={intent_type.value} confidence={result_dict.get('confidence', 0):.2f}"
                 )
 
                 # Route based on intent
                 async with async_session() as session:
                     from src.services.farmer_service import FarmerService
+                    from src.classifier.intents import IntentResult
                     farmer_svc = FarmerService(session)
 
                     # Look up farmer profile
                     farmer = await farmer_svc.get_by_phone(msg.from_phone)
+
+                    # Reconstruct IntentResult object from dict for handlers
+                    intent_result = IntentResult(
+                        intent=intent_type,
+                        confidence=result_dict.get("confidence", 0),
+                        commodity=result_dict.get("commodity"),
+                        district=result_dict.get("district"),
+                        source=result_dict.get("source", "regex"),
+                        raw_text=msg.text or "",
+                    )
 
                     # Weather query (Phase 2 Module 1)
                     if intent_type == Intent.WEATHER_QUERY:
@@ -189,7 +252,7 @@ async def receive_message(request: Request):
                         farmer_district = farmer.district if farmer else "pune"
                         farmer_language = farmer.preferred_language if farmer else "mr"
                         reply = await handler.handle(
-                            result,
+                            intent_result,
                             farmer_apmc=farmer_district,
                             farmer_language=farmer_language,
                         )
@@ -213,7 +276,7 @@ async def receive_message(request: Request):
 
                         farmer_language = farmer.preferred_language if farmer else "mr"
                         reply = await handler.handle(
-                            result,
+                            intent_result,
                             media_url=msg.media_url,
                             farmer_phone=msg.from_phone,
                             farmer_language=farmer_language,
@@ -229,11 +292,11 @@ async def receive_message(request: Request):
 
                         price_repo = PriceRepository(session)
                         # Use district from query result, or fall back to farmer's district
-                        query_district = result.get("district") or (farmer.district if farmer else None)
+                        query_district = intent_result.district or (farmer.district if farmer else None)
                         farmer_language = farmer.preferred_language if farmer else "mr"
 
                         query = PriceQuery(
-                            commodity=result.get("commodity", ""),
+                            commodity=intent_result.commodity or "",
                             district=query_district,
                         )
                         price_result = await price_repo.query(query, farmer_district=query_district)

@@ -2,8 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Optional
 
-from sqlalchemy import String, Integer, Date, DateTime, Numeric, Boolean, Index, UniqueConstraint, ForeignKey, UUID as SA_UUID
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, Integer, Date, DateTime, Numeric, Boolean, Index, UniqueConstraint, ForeignKey, UUID as SA_UUID, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -34,7 +33,7 @@ class MandiPrice(Base):
     msp: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2))
     arrival_quantity_qtl: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2))
     source: Mapped[str] = mapped_column(String(50), default="agmarknet", nullable=False)
-    raw_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSONB)
+    raw_payload: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)
     fetched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     is_stale: Mapped[bool] = mapped_column(Boolean, default=False)
 

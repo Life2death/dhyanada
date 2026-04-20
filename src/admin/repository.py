@@ -127,20 +127,37 @@ class AdminRepository:
 
     async def get_top_crops(self, limit: int = 5) -> List[CropStat]:
         """Top commodities by query frequency."""
-        # Query detected_entities JSONB for commodity field
-        stmt = text("""
-            SELECT
-                (detected_entities->>'commodity') as commodity,
-                COUNT(*) as cnt
-            FROM conversations
-            WHERE direction = 'inbound'
-              AND detected_intent = 'PRICE_QUERY'
-              AND detected_entities ? 'commodity'
-            GROUP BY (detected_entities->>'commodity')
-            ORDER BY cnt DESC
-            LIMIT :limit
-        """)
-        result = await self.session.execute(stmt, {"limit": limit})
+        # Query detected_entities JSON for commodity field (SQLite compatible with fallback for PostgreSQL)
+        try:
+            # Try SQLite's json_extract function first
+            stmt = text("""
+                SELECT
+                    json_extract(detected_entities, '$.commodity') as commodity,
+                    COUNT(*) as cnt
+                FROM conversations
+                WHERE direction = 'inbound'
+                  AND detected_intent = 'PRICE_QUERY'
+                  AND json_extract(detected_entities, '$.commodity') IS NOT NULL
+                GROUP BY commodity
+                ORDER BY cnt DESC
+                LIMIT :limit
+            """)
+            result = await self.session.execute(stmt, {"limit": limit})
+        except:
+            # Fallback for PostgreSQL JSONB syntax
+            stmt = text("""
+                SELECT
+                    (detected_entities->>'commodity') as commodity,
+                    COUNT(*) as cnt
+                FROM conversations
+                WHERE direction = 'inbound'
+                  AND detected_intent = 'PRICE_QUERY'
+                  AND detected_entities ? 'commodity'
+                GROUP BY (detected_entities->>'commodity')
+                ORDER BY cnt DESC
+                LIMIT :limit
+            """)
+            result = await self.session.execute(stmt, {"limit": limit})
         rows = result.fetchall()
 
         return [
@@ -328,3 +345,107 @@ class AdminRepository:
             broadcast_health=broadcast_health,
             generated_at=datetime.now(),
         )
+
+    # Phase 3 Step 3: Error Monitoring & Alerting
+
+    async def get_error_summary(self, hours: int = 24) -> dict:
+        """Get error counts by service and type in past N hours."""
+        from src.models.error_log import ErrorLog
+
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        stmt = select(
+            ErrorLog.service,
+            ErrorLog.error_type,
+            func.count(ErrorLog.id).label("count")
+        ).where(
+            ErrorLog.created_at >= cutoff
+        ).group_by(ErrorLog.service, ErrorLog.error_type)
+
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        summary = {
+            "period_hours": hours,
+            "total_errors": sum(row[2] for row in rows),
+            "by_service": {},
+        }
+
+        for service, error_type, count in rows:
+            if service not in summary["by_service"]:
+                summary["by_service"][service] = {}
+            summary["by_service"][service][error_type] = count
+
+        return summary
+
+    async def get_recent_errors(self, limit: int = 50) -> list:
+        """Get recent errors (last N)."""
+        from src.models.error_log import ErrorLog
+
+        stmt = select(ErrorLog).order_by(
+            ErrorLog.created_at.desc()
+        ).limit(limit)
+
+        result = await self.session.execute(stmt)
+        errors = result.scalars().all()
+
+        return [
+            {
+                "id": e.id,
+                "service": e.service,
+                "error_type": e.error_type,
+                "message": e.message,
+                "created_at": e.created_at.isoformat(),
+                "context": e.context_json,
+            }
+            for e in errors
+        ]
+
+    async def get_service_health(self) -> dict:
+        """Get current health status of all services."""
+        from src.models.service_health import ServiceHealth
+
+        stmt = select(ServiceHealth)
+        result = await self.session.execute(stmt)
+        services = result.scalars().all()
+
+        return {
+            "services": [
+                {
+                    "name": s.service_name,
+                    "healthy": s.is_healthy,
+                    "error_rate_1h": s.error_rate_1h,
+                    "error_rate_24h": s.error_rate_24h,
+                    "latency_ms": s.avg_latency_ms,
+                    "last_heartbeat": s.last_heartbeat.isoformat() if s.last_heartbeat else None,
+                    "last_error": s.last_error_message,
+                }
+                for s in services
+            ],
+            "overall_health": "healthy" if all(s.is_healthy for s in services) else "degraded",
+        }
+
+    async def get_error_timeline(self, hours: int = 24) -> list:
+        """Get error counts grouped by hour for graphing."""
+        from src.models.error_log import ErrorLog
+
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+
+        # SQL to group errors by hour
+        stmt = select(
+            func.date_trunc('hour', ErrorLog.created_at).label('hour'),
+            func.count(ErrorLog.id).label('count')
+        ).where(
+            ErrorLog.created_at >= cutoff
+        ).group_by(func.date_trunc('hour', ErrorLog.created_at)).order_by('hour')
+
+        result = await self.session.execute(stmt)
+        rows = result.all()
+
+        return [
+            {
+                "hour": str(row[0]),
+                "count": row[1],
+            }
+            for row in rows
+        ]

@@ -1,8 +1,7 @@
 from datetime import datetime
 from typing import Optional, Any
 
-from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, Index
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, Integer, DateTime, Text, ForeignKey, Index, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.sql import func
 
@@ -19,7 +18,7 @@ class Conversation(Base):
     message_type: Mapped[str] = mapped_column(String(20), nullable=False)  # 'text' | 'template' | 'interactive' | 'audio'
     raw_message: Mapped[Optional[str]] = mapped_column(Text)
     detected_intent: Mapped[Optional[str]] = mapped_column(String(50))
-    detected_entities: Mapped[Optional[Any]] = mapped_column(JSONB)
+    detected_entities: Mapped[Optional[Any]] = mapped_column(JSON)
     response_sent: Mapped[Optional[str]] = mapped_column(Text)
     media_url: Mapped[Optional[str]] = mapped_column(String(500))  # Meta WhatsApp media URL (24-hour expiry)
     voice_transcription: Mapped[Optional[str]] = mapped_column(Text)  # Transcribed text from STT (Google Cloud / Whisper)

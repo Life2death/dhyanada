@@ -106,6 +106,108 @@ async def _broadcast_prices_async():
 
 
 @app.task(bind=True, max_retries=3)
+def trigger_farm_advisories(self):
+    """Daily: generate advisories for all farmers and WhatsApp-push high-risk ones.
+
+    Runs at 6:45 AM IST (after weather ingest at 6:00). Idempotent via UNIQUE
+    (farmer_id, rule_id, advisory_date) — safe to re-run manually.
+    """
+    import asyncio
+    return asyncio.run(_trigger_farm_advisories_async())
+
+
+async def _trigger_farm_advisories_async():
+    """Generate advisories for every farmer, then WhatsApp-push high-risk ones."""
+    from src.advisory.engine import generate_for_all_farmers
+    from src.advisory.repository import AdvisoryRepository
+    from src.models.advisory import Advisory
+
+    logger.info("trigger_farm_advisories: starting")
+    engine = create_async_engine(settings.database_url)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    MAX_PUSH_PER_FARMER = 2
+
+    try:
+        async with async_session() as session:
+            counts = await generate_for_all_farmers(session)
+            total_created = sum(counts.values())
+            logger.info(
+                "trigger_farm_advisories: generated %d advisories across %d farmers",
+                total_created, len(counts),
+            )
+
+            # WhatsApp push — high-risk only, capped per farmer, only today's
+            whatsapp = WhatsAppAdapter()
+            repo = AdvisoryRepository(session)
+            today = date.today()
+            pushed = skipped = errors = 0
+
+            for farmer_id, created in counts.items():
+                if not created:
+                    continue
+                farmer = (
+                    await session.execute(select(Farmer).where(Farmer.id == farmer_id))
+                ).scalar_one_or_none()
+                if not farmer or not farmer.phone:
+                    continue
+                if farmer.deleted_at or farmer.erasure_requested_at:
+                    continue
+
+                # Fetch today's high-risk undelivered advisories for this farmer
+                stmt = (
+                    select(Advisory)
+                    .where(
+                        Advisory.farmer_id == farmer_id,
+                        Advisory.advisory_date == today,
+                        Advisory.risk_level == "high",
+                    )
+                    .order_by(Advisory.created_at.desc())
+                    .limit(MAX_PUSH_PER_FARMER)
+                )
+                to_push = list((await session.execute(stmt)).scalars().all())
+                for adv in to_push:
+                    already = (adv.delivered_via or {}).get("whatsapp")
+                    if already:
+                        skipped += 1
+                        continue
+                    try:
+                        src_line = f"\nSource: {adv.source_citation}" if adv.source_citation else ""
+                        msg = (
+                            f"🌾 Kisan AI advisory\n"
+                            f"{adv.title}\n"
+                            f"{adv.message}\n"
+                            f"👉 {adv.action_hint}"
+                            f"{src_line}"
+                        )
+                        msg_id = await whatsapp.send_text_message(to=farmer.phone, text=msg)
+                        if msg_id:
+                            await repo.mark_whatsapp_delivered(adv.id, msg_id)
+                            pushed += 1
+                        else:
+                            errors += 1
+                    except Exception as exc:
+                        logger.error(
+                            "trigger_farm_advisories: WhatsApp push failed farmer=%s adv=%s: %s",
+                            farmer.phone, adv.id, exc,
+                        )
+                        errors += 1
+
+            logger.info(
+                "trigger_farm_advisories: complete generated=%d pushed=%d skipped=%d errors=%d",
+                total_created, pushed, skipped, errors,
+            )
+            return {
+                "generated": total_created,
+                "pushed": pushed,
+                "skipped": skipped,
+                "errors": errors,
+            }
+    finally:
+        await engine.dispose()
+
+
+@app.task(bind=True, max_retries=3)
 def hard_delete_erased_farmers(self):
     """
     Hard-delete farmers whose 30-day erasure countdown has expired.

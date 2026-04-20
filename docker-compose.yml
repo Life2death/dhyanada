@@ -53,25 +53,113 @@ services:
         max-size: "10m"
         max-file: "3"
 
-  # FastAPI Application (optional - for docker-compose up to include app)
-  # Uncomment to run app in Docker
-  # app:
-  #   build: .
-  #   container_name: kisan_ai_app
-  #   environment:
-  #     DATABASE_URL: postgresql://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
-  #     REDIS_URL: redis://redis:6379
-  #     WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID}
-  #     WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
-  #   ports:
-  #     - "8000:8000"
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   networks:
-  #     - kisan_network
+  # FastAPI Application
+  app:
+    build: .
+    container_name: kisan_ai_app
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
+      REDIS_URL: redis://redis:6379
+
+      # WhatsApp
+      WHATSAPP_PHONE_ID: ${WHATSAPP_PHONE_ID:-1135216599663873}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN}
+      WHATSAPP_BUSINESS_ACCOUNT_ID: ${WHATSAPP_BUSINESS_ACCOUNT_ID:-1888194241890478}
+      WHATSAPP_VERIFY_TOKEN: ${WHATSAPP_VERIFY_TOKEN:-kisan_webhook_token}
+
+      # FastAPI
+      FASTAPI_ENV: development
+      FASTAPI_DEBUG: "false"
+      CALLBACK_URL: http://localhost:8000/webhook/whatsapp
+
+      # Logging
+      LOG_LEVEL: INFO
+
+      # Admin Dashboard
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-changeme}
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key-change-in-production}
+
+      # Email/Alerting (Phase 3 Step 3)
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+
+      # APIs
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
+      AGROMONITORING_API_KEY: ${AGROMONITORING_API_KEY}
+      AGMARKNET_API_KEY: ${AGMARKNET_API_KEY}
+
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - kisan_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # Celery Worker for async tasks
+  worker:
+    build: .
+    container_name: kisan_ai_worker
+    command: celery -A src.scheduler.celery_app worker -l info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
+      REDIS_URL: redis://redis:6379
+      FASTAPI_ENV: development
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - kisan_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
+
+  # Celery Beat for scheduled tasks
+  beat:
+    build: .
+    container_name: kisan_ai_beat
+    command: celery -A src.scheduler.celery_app beat -l info
+    environment:
+      DATABASE_URL: postgresql+asyncpg://kisan:kisan_secure_dev_password@postgres:5432/kisan_ai
+      REDIS_URL: redis://redis:6379
+      FASTAPI_ENV: development
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - kisan_network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    restart: unless-stopped
 
 volumes:
   postgres_data:

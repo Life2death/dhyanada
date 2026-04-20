@@ -49,7 +49,7 @@ def pick_winners(records: Iterable[WeatherRecord]) -> list[WeatherRecord]:
     # Group by natural key
     buckets: dict[tuple, list[WeatherRecord]] = defaultdict(list)
     for rec in records:
-        key = (rec.trade_date, rec.apmc, rec.metric, rec.forecast_days_ahead)
+        key = (rec.trade_date, rec.apmc, rec.taluka, rec.metric, rec.forecast_days_ahead)
         buckets[key].append(rec)
 
     # Pick winners per bucket

@@ -35,6 +35,13 @@ class Farmer(Base):
     crops: Mapped[List["CropOfInterest"]] = relationship(
         "CropOfInterest", back_populates="farmer", cascade="all, delete-orphan"
     )
+    sessions: Mapped[List["FarmerSession"]] = relationship(
+        "FarmerSession", back_populates="farmer", cascade="all, delete-orphan"
+    )
+    # MSPAlert declares back_populates="msp_alerts" — needs a matching relationship here.
+    msp_alerts: Mapped[List["MSPAlert"]] = relationship(  # type: ignore[name-defined]  # noqa: F821
+        "MSPAlert", back_populates="farmer", cascade="all, delete-orphan"
+    )
 
     __table_args__ = (
         Index("idx_farmers_phone", "phone"),

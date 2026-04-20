@@ -44,7 +44,7 @@ class WhatsAppAdapter:
         try:
             if not self.client:
                 return None
-            msg_id = await self.client.send_message(to=to, text=text)
+            msg_id = self.client.send_message(to=to, text=text)
             logger.info(f"Message sent to {to}")
             return msg_id
         except Exception as e:
@@ -72,8 +72,8 @@ class WhatsAppAdapter:
             return None
 
         try:
-            # Call Meta's /media/{media_id} endpoint
-            url = f"https://graph.instagram.com/v18.0/{media_id}"
+            # Call Meta's /media/{media_id} endpoint (use Facebook Graph API, not Instagram)
+            url = f"https://graph.facebook.com/v18.0/{media_id}?fields=url"
             headers = {"Authorization": f"Bearer {self.config.token}"}
 
             async with httpx.AsyncClient() as client:
