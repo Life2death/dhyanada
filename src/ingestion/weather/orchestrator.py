@@ -15,6 +15,7 @@ from src.ingestion.weather.sources.base import WeatherRecord, WeatherSource
 from src.ingestion.weather.sources.imd_api import IMDWeatherSource
 from src.ingestion.weather.sources.openweather_api import OpenWeatherSource
 from src.ingestion.weather.sources.agromonitoring_api import AgroMonitoringSource
+from src.ingestion.weather.sources.openmeteo_api import OpenMeteoWeatherSource
 from src.ingestion.weather.normalizer import normalize_metric, normalize_apmc, normalize_unit
 from src.ingestion.weather.merger import pick_winners
 from src.models.weather import WeatherObservation
