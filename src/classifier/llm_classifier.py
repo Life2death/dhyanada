@@ -1,6 +1,6 @@
 """OpenRouter LLM fallback classifier with model fallback chain.
 
-Tries models in order: Meta Llama 3.1 8B -> Google Gemma 2 9B (free) -> Mistral 7B.
+Tries: Meta Llama 3.1 8B -> Google Gemma 2 9B (free) -> Mistral 7B.
 Falls back to next model on any error. Returns UNKNOWN if all fail.
 """
 from __future__ import annotations
@@ -15,28 +15,26 @@ from src.config import settings
 
 logger = logging.getLogger(__name__)
 
-_SYSTEM_PROMPT = """You are an intent classifier for Kisan AI, a WhatsApp bot serving farmers in Maharashtra, India.
-
-Classify messages into exactly one intent:
-- price_query    : farmer wants today mandi price
-- subscribe      : farmer wants daily price broadcasts
-- unsubscribe    : farmer wants to stop broadcasts
-- onboarding     : new farmer asking how to use the service
-- help           : asking for list of commands or features
-- greeting       : just saying hello/namaste with no clear intent
-- feedback       : giving feedback, complaint, or thanks
-- unknown        : cannot classify
-
-Farmers message in Marathi (Devanagari), English, or Hinglish.
-Extract commodity if mentioned: onion, tur, soyabean, cotton, tomato, potato, wheat, chana, jowar, bajra, grapes, pomegranate, maize — or null.
-Extract district if mentioned: pune, ahilyanagar, navi_mumbai, mumbai, nashik — or null.
-
-Respond ONLY with valid JSON, no markdown:
-{"intent":"<slug>","confidence":<0.0-1.0>,"commodity":"<slug or null>","district":"<slug or null>","explanation":"<one line>"}
-"""
+_SYSTEM_PROMPT = (
+    "You are an intent classifier for Kisan AI, a WhatsApp bot for Maharashtra farmers.\n\n"
+    "Classify into exactly one intent:\n"
+    "- price_query    : farmer wants today mandi price\n"
+    "- subscribe      : farmer wants daily price broadcasts\n"
+    "- unsubscribe    : farmer wants to stop broadcasts\n"
+    "- onboarding     : new farmer asking how to use the service\n"
+    "- help           : asking for commands or features\n"
+    "- greeting       : hello/namaste with no clear intent\n"
+    "- feedback       : feedback, complaint, or thanks\n"
+    "- unknown        : cannot classify\n\n"
+    "Farmers write in Marathi (Devanagari), English, or Hinglish.\n"
+    "Extract commodity if mentioned: onion, tur, soyabean, cotton, tomato, potato, wheat, chana, jowar, bajra, grapes, pomegranate, maize -- or null.\n"
+    "Extract district if mentioned: pune, ahilyanagar, navi_mumbai, mumbai, nashik -- or null.\n\n"
+    'Respond ONLY with valid JSON, no markdown:\n'
+    '{"intent":"<slug>","confidence":<0.0-1.0>,"commodity":"<slug or null>","district":"<slug or null>","explanation":"<one line>"}\n'
+)
 
 _FEW_SHOT = [
-    ("आजचा कांदा भाव काय आहे?",
+    ("\u0906\u091c\u091a\u093e \u0915\u093e\u0902\u0926\u093e \u092d\u093e\u0935 \u0915\u093e\u092f \u0906\u0939\u0947?",
      '{"intent":"price_query","confidence":0.99,"commodity":"onion","district":null,"explanation":"Marathi: today onion price"}'),
     ("Nashik mandi me soyabean ka bhav kya hai",
      '{"intent":"price_query","confidence":0.98,"commodity":"soyabean","district":"nashik","explanation":"Hinglish price query"}'),
@@ -48,7 +46,6 @@ _FEW_SHOT = [
      '{"intent":"onboarding","confidence":0.95,"commodity":null,"district":null,"explanation":"Hinglish registration request"}'),
 ]
 
-# Fallback chain: try in order, skip on error
 _MODEL_CHAIN = [
     "meta-llama/llama-3.1-8b-instruct",
     "google/gemma-2-9b-it:free",
@@ -57,16 +54,16 @@ _MODEL_CHAIN = [
 
 
 def _build_messages(text: str) -> list[dict]:
-    few_shot_text = "
-".join(
-        f'User: "{msg}"
-Assistant: {resp}' for msg, resp in _FEW_SHOT
-    )
+    few_shot_parts = []
+    for msg, resp in _FEW_SHOT:
+        few_shot_parts.append('User: "' + msg + '"')
+        few_shot_parts.append("Assistant: " + resp)
+    few_shot_parts.append('User: "' + text + '"')
+    few_shot_parts.append("Assistant:")
+    user_content = "\n".join(few_shot_parts)
     return [
         {"role": "system", "content": _SYSTEM_PROMPT},
-        {"role": "user", "content": f'{few_shot_text}
-User: "{text}"
-Assistant:'},
+        {"role": "user", "content": user_content},
     ]
 
 
@@ -106,13 +103,13 @@ def _fallback(text: str, reason: str) -> IntentResult:
     )
 
 
-async def _try_model(client, api_key: str, model: str, text: str) -> IntentResult | None:
-    """Try a single model. Returns None on any error so caller can try next."""
+async def _try_model(client, api_key: str, model: str, text: str):
+    """Try one model. Returns None on any error so caller tries next."""
     try:
         resp = await client.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
-                "Authorization": f"Bearer {api_key}",
+                "Authorization": "Bearer " + api_key,
                 "HTTP-Referer": "https://kisan-ai-production-6f73.up.railway.app",
                 "X-Title": "Kisan AI",
             },
@@ -144,7 +141,6 @@ async def classify_llm(text: str) -> IntentResult:
         logger.warning("llm_classifier: no API key configured")
         return _fallback(text, "no_api_key")
 
-    # Use configured model as first in chain if explicitly set
     configured_model = getattr(settings, "openrouter_model", "")
     chain = _MODEL_CHAIN.copy()
     if configured_model and configured_model not in chain:
