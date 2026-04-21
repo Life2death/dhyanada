@@ -6,8 +6,12 @@ WORKDIR /build
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    gcc \
-    libpq-dev \
+   libpq-dev \
+    libxml2-dev \
+    libxslt1-dev \
+    libjpeg-dev \
+    libpng-dev \
+    zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install Python packages
@@ -21,7 +25,9 @@ WORKDIR /app
 
 # Install runtime dependencies only (no build tools)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq5 \
+  libpq5 \
+    libxml2 \
+    libxslt1.1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Create non-root app user (security best practice)
