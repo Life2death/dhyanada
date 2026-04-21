@@ -53,7 +53,7 @@ def upgrade() -> None:
 
     # Add deleted_at to conversation (soft-delete for privacy)
     op.add_column(
-        "conversation",
+        "conversations",
         sa.Column(
             "deleted_at",
             sa.DateTime(timezone=True),
@@ -79,7 +79,7 @@ def upgrade() -> None:
     # Create index on conversation deleted_at for filtering soft-deleted records
     op.create_index(
         "idx_conversation_deleted",
-        "conversation",
+        "conversations",
         ["deleted_at"],
     )
 
@@ -87,10 +87,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Rollback DPDPA fields."""
 
-    op.drop_index("idx_conversation_deleted", table_name="conversation")
+    op.drop_index("idx_conversation_deleted", table_name="conversations")
     op.drop_index("idx_broadcast_log_deleted", table_name="broadcast_log")
     op.drop_index("idx_farmers_erasure_requested", table_name="farmers")
 
-    op.drop_column("conversation", "deleted_at")
+    op.drop_column("conversations", "deleted_at")
     op.drop_column("broadcast_log", "deleted_at")
     op.drop_column("farmers", "erasure_requested_at")
