@@ -582,6 +582,217 @@ async def _ingest_government_schemes_async():
 
 
 @app.task(bind=True, max_retries=3)
+def refresh_village_data(self):
+    """
+    Hourly: fetch one taluka's villages from OpenStreetMap Overpass API
+    and upsert into the villages table with accurate GPS coordinates.
+
+    Progress is tracked in Redis:
+      village_refresh:taluka_index   — next taluka to fetch (0-13)
+      village_refresh:cooldown_until — ISO timestamp; skip until full-sweep cooldown expires
+
+    Cycle: 14 runs × 1 hour = full Ahilyanagar sweep in 14 hours.
+    After a full sweep, waits 30 days before the next cycle.
+    """
+    import asyncio
+    return asyncio.run(_refresh_village_data_async())
+
+
+# --- taluka list (canonical name → OSM search name) ---
+_AHILYANAGAR_TALUKA_LIST = [
+    ("Ahmednagar", "Ahmednagar"),
+    ("Akola",      "Akola"),
+    ("Jamkhed",    "Jamkhed"),
+    ("Karjat",     "Karjat"),
+    ("Kopargaon",  "Kopargaon"),
+    ("Nevasa",     "Nevasa"),
+    ("Parner",     "Parner"),
+    ("Pathardi",   "Pathardi"),
+    ("Rahata",     "Rahata"),
+    ("Rahuri",     "Rahuri"),
+    ("Sangamner",  "Sangamner"),
+    ("Shevgaon",   "Shevgaon"),
+    ("Shrigonda",  "Shrigonda"),
+    ("Shrirampur", "Shrirampur"),
+]
+
+_TALUKA_CENTROIDS = {
+    "Ahmednagar": (19.0948, 74.7480),
+    "Akola":      (18.9667, 74.9833),
+    "Jamkhed":    (18.7167, 75.3167),
+    "Karjat":     (18.9167, 75.1167),
+    "Kopargaon":  (19.8833, 74.4833),
+    "Nevasa":     (19.5333, 74.9667),
+    "Parner":     (19.0000, 74.4333),
+    "Pathardi":   (19.1833, 75.1833),
+    "Rahata":     (19.7167, 74.4833),
+    "Rahuri":     (19.3833, 74.6500),
+    "Sangamner":  (19.5667, 74.2000),
+    "Shevgaon":   (19.3167, 75.1833),
+    "Shrigonda":  (18.6167, 74.7000),
+    "Shrirampur": (19.6167, 74.6500),
+}
+
+_OVERPASS_URL  = "https://overpass-api.de/api/interpreter"
+_OSM_DISTRICT  = "Ahmednagar"   # OSM still indexes under the old name
+_COOLDOWN_DAYS = 30
+_REDIS_IDX_KEY = "village_refresh:taluka_index"
+_REDIS_CD_KEY  = "village_refresh:cooldown_until"
+
+
+async def _refresh_village_data_async():
+    import asyncio
+    import redis.asyncio as aioredis
+    from sqlalchemy import text as sql_text
+
+    logger.info("refresh_village_data: starting")
+
+    redis_client = aioredis.from_url(settings.redis_url, decode_responses=True)
+    async with redis_client as r:
+        # --- cooldown check ---
+        cooldown_until = await r.get(_REDIS_CD_KEY)
+        if cooldown_until:
+            until_dt = datetime.fromisoformat(cooldown_until)
+            if datetime.now(timezone.utc) < until_dt:
+                logger.info("refresh_village_data: cooldown active until %s, skipping", cooldown_until)
+                return {"status": "cooldown", "until": cooldown_until}
+            await r.delete(_REDIS_CD_KEY)
+
+        # --- which taluka is next? ---
+        idx = int(await r.get(_REDIS_IDX_KEY) or 0)
+
+        if idx >= len(_AHILYANAGAR_TALUKA_LIST):
+            # full sweep done → start 30-day cooldown, reset index
+            until_dt = datetime.now(timezone.utc) + timedelta(days=_COOLDOWN_DAYS)
+            await r.set(_REDIS_CD_KEY, until_dt.isoformat())
+            await r.set(_REDIS_IDX_KEY, "0")
+            logger.info("refresh_village_data: all 14 talukas done, cooldown until %s", until_dt.date())
+            return {"status": "sweep_complete", "cooldown_days": _COOLDOWN_DAYS}
+
+        canonical, osm_name = _AHILYANAGAR_TALUKA_LIST[idx]
+        logger.info("refresh_village_data: fetching taluka=%s (index %d/14)", canonical, idx)
+
+        # --- fetch from Overpass (blocking HTTP → thread) ---
+        villages = await asyncio.to_thread(_fetch_villages_sync, osm_name, canonical)
+        logger.info("refresh_village_data: taluka=%s got %d villages from OSM", canonical, len(villages))
+
+        # --- upsert into DB ---
+        upserted = 0
+        if villages:
+            engine = create_async_engine(settings.database_url)
+            async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+            try:
+                async with async_session() as session:
+                    for vn, lat, lon in villages:
+                        await session.execute(
+                            sql_text(
+                                "INSERT INTO villages "
+                                "(village_name, taluka_name, district_name, district_slug, latitude, longitude) "
+                                "VALUES (:vn, :tn, :dn, :ds, :lat, :lon) "
+                                "ON CONFLICT (village_name, taluka_name, district_slug) "
+                                "DO UPDATE SET latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude"
+                            ),
+                            {"vn": vn, "tn": canonical, "dn": "Ahilyanagar",
+                             "ds": "ahilyanagar", "lat": lat, "lon": lon},
+                        )
+                        upserted += 1
+                    await session.commit()
+            finally:
+                await engine.dispose()
+
+        # --- advance index ---
+        await r.set(_REDIS_IDX_KEY, str(idx + 1))
+        remaining = len(_AHILYANAGAR_TALUKA_LIST) - idx - 1
+        logger.info(
+            "refresh_village_data: done taluka=%s upserted=%d remaining=%d",
+            canonical, upserted, remaining,
+        )
+        return {"taluka": canonical, "upserted": upserted, "index": idx, "remaining": remaining}
+
+
+def _fetch_villages_sync(osm_name: str, canonical: str) -> list[tuple[str, float, float]]:
+    """Blocking Overpass HTTP call — run in a thread via asyncio.to_thread."""
+    import json
+    import urllib.parse
+    import urllib.request
+
+    # Try 1: taluka area scoped inside the district
+    ql = f"""
+[out:json][timeout:90];
+area["name"="{_OSM_DISTRICT}"]["admin_level"="6"]->.d;
+area["name"="{osm_name}"](area.d)->.t;
+(
+  node["place"~"^(village|hamlet|town)$"](area.t);
+  way["place"~"^(village|hamlet|town)$"](area.t);
+);
+out center;
+"""
+    try:
+        result = _overpass_post(ql)
+        villages = _parse_overpass_result(result)
+        if villages:
+            return villages
+    except Exception as exc:
+        logger.warning("refresh_village_data: overpass attempt-1 failed for %s: %s", canonical, exc)
+
+    # Try 2: state-code filter (broader, less precise)
+    ql2 = f"""
+[out:json][timeout:90];
+area["name"="{osm_name}"]["admin_level"~"7|8"]["is_in"~"Maharashtra"]->.t;
+(
+  node["place"~"^(village|hamlet|town)$"](area.t);
+  way["place"~"^(village|hamlet|town)$"](area.t);
+);
+out center;
+"""
+    try:
+        result = _overpass_post(ql2)
+        villages = _parse_overpass_result(result)
+        if villages:
+            return villages
+    except Exception as exc:
+        logger.warning("refresh_village_data: overpass attempt-2 failed for %s: %s", canonical, exc)
+
+    # Fallback: at least return the taluka town itself using centroid
+    lat, lon = _TALUKA_CENTROIDS.get(canonical, (19.0, 74.5))
+    return [(canonical, lat, lon)]
+
+
+def _overpass_post(ql: str) -> dict:
+    import json, urllib.parse, urllib.request
+    data = urllib.parse.urlencode({"data": ql}).encode()
+    req = urllib.request.Request(
+        _OVERPASS_URL, data=data,
+        headers={"User-Agent": "KisanAI-VillageRefresh/1.0 (vikram.panmand@gmail.com)"},
+    )
+    with urllib.request.urlopen(req, timeout=120) as r:
+        return json.loads(r.read())
+
+
+def _parse_overpass_result(result: dict) -> list[tuple[str, float, float]]:
+    seen: set[str] = set()
+    villages: list[tuple[str, float, float]] = []
+    for elem in result.get("elements", []):
+        tags = elem.get("tags", {})
+        name = tags.get("name:en") or tags.get("name") or tags.get("name:mr")
+        if not name:
+            continue
+        name = name.strip()
+        if name in seen:
+            continue
+        lat = lon = None
+        if elem["type"] == "node":
+            lat, lon = elem.get("lat"), elem.get("lon")
+        else:
+            c = elem.get("center", {})
+            lat, lon = c.get("lat"), c.get("lon")
+        if lat and lon:
+            seen.add(name)
+            villages.append((name, float(lat), float(lon)))
+    return villages
+
+
+@app.task(bind=True, max_retries=3)
 def trigger_msp_alerts(self):
     """
     Check active MSP alert subscriptions against just-ingested scheme MSP data.
