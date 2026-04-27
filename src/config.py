@@ -99,8 +99,10 @@ def get_settings() -> Settings:
         s.database_url = s.database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
     elif s.database_url.startswith("postgres://"):
         s.database_url = s.database_url.replace("postgres://", "postgresql+asyncpg://", 1)
-    # Ensure Redis URL has a valid scheme (Railway sometimes omits it)
-    if s.redis_url and not s.redis_url.startswith(("redis://", "rediss://", "unix://")):
+    # Ensure Redis URL has a valid scheme (Railway sometimes omits it or sends empty)
+    if not s.redis_url:
+        s.redis_url = "redis://localhost:6379/0"
+    elif not s.redis_url.startswith(("redis://", "rediss://", "unix://")):
         s.redis_url = "redis://" + s.redis_url
     return s
 

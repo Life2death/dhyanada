@@ -59,6 +59,12 @@ async def startup_event():
         logger.error(f"❌ Failed to initialize WhatsApp adapter: {e}")
         raise
 
+    # Log resolved Redis URL so we can verify env var injection on Railway
+    masked = settings.redis_url
+    if "@" in masked:
+        masked = masked[:masked.index("://") + 3] + "***@" + masked.split("@", 1)[1]
+    logger.info(f"🔴 Redis URL resolved to: {masked}")
+
 
 # Data models for webhook
 class WebhookMessage(BaseModel):
