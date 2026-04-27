@@ -522,34 +522,159 @@ async def status():
 
 
 
-# Test endpoint for weather ingestion
+# ── Test / validation endpoints ────────────────────────────────────────────
+
 @app.get("/test/weather-ingest")
 async def test_weather_ingest():
-    """Test endpoint: trigger weather ingestion now (for testing only)."""
+    """Trigger weather ingestion now and return a run summary."""
     from datetime import date
     from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
     from sqlalchemy.orm import sessionmaker
     from src.ingestion.weather.orchestrator import run_ingestion
-    
+
     try:
         engine = create_async_engine(settings.database_url)
         AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-        
         async with AsyncSessionLocal() as session:
             summary = await run_ingestion(date.today(), session)
-            await engine.dispose()
-        
+        await engine.dispose()
         return {
             "status": "success",
             "date": str(date.today()),
-            "summary": summary
+            "total_fetched": summary.total_fetched,
+            "total_normalized": summary.total_normalized,
+            "total_merged": summary.total_merged,
+            "total_inserted": summary.total_inserted,
+            "source_counts": summary.source_counts,
+            "errors": summary.errors,
         }
     except Exception as e:
-        logger.error(f"Weather ingest test failed: {e}", exc_info=True)
+        logger.error("Weather ingest test failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/test/price-ingest")
+async def test_price_ingest():
+    """Trigger mandi price ingestion now and return a run summary."""
+    from datetime import date
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from src.ingestion.orchestrator import run_ingestion
+
+    try:
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with AsyncSessionLocal() as session:
+            summary = await run_ingestion(date.today(), session)
+        await engine.dispose()
         return {
-            "status": "error",
-            "message": str(e)
+            "status": "success",
+            "date": str(summary.trade_date),
+            "total_records": summary.total_records,
+            "winner_count": summary.winner_count,
+            "persisted": summary.persisted,
+            "per_source_counts": summary.per_source_counts,
+            "errors": summary.errors,
+            "duration_s": round(summary.duration_s, 2),
         }
+    except Exception as e:
+        logger.error("Price ingest test failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/test/weather-data")
+async def test_weather_data():
+    """Show what weather data currently exists in the DB."""
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from sqlalchemy import select, func, text
+
+    try:
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with AsyncSessionLocal() as session:
+            # Summary: rows per metric+district
+            summary_rows = await session.execute(text("""
+                SELECT metric, district, COUNT(*) AS rows,
+                       MIN(date) AS earliest, MAX(date) AS latest,
+                       array_agg(DISTINCT source) AS sources
+                FROM weather_observations
+                GROUP BY metric, district
+                ORDER BY metric, district
+            """))
+            summary = [dict(r._mapping) for r in summary_rows]
+
+            # Latest observations (today or most recent) for each metric+apmc
+            latest_rows = await session.execute(text("""
+                SELECT date, apmc, district, metric, value, unit,
+                       min_value, max_value, condition, forecast_days_ahead, source
+                FROM weather_observations
+                WHERE date = (SELECT MAX(date) FROM weather_observations)
+                  AND forecast_days_ahead = 0
+                ORDER BY district, apmc, metric
+            """))
+            latest = [dict(r._mapping) for r in latest_rows]
+
+        await engine.dispose()
+        return {
+            "status": "ok",
+            "summary_by_metric_district": summary,
+            "latest_observations": latest,
+        }
+    except Exception as e:
+        logger.error("Weather data query failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
+@app.get("/test/price-data")
+async def test_price_data():
+    """Show what mandi price data currently exists in the DB."""
+    from sqlalchemy import text
+
+    try:
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with AsyncSessionLocal() as session:
+            # Summary: rows per crop
+            crop_summary = await session.execute(text("""
+                SELECT crop, COUNT(*) AS rows,
+                       MIN(date) AS earliest, MAX(date) AS latest,
+                       array_agg(DISTINCT district ORDER BY district) AS districts,
+                       array_agg(DISTINCT source ORDER BY source) AS sources
+                FROM mandi_prices
+                GROUP BY crop
+                ORDER BY rows DESC
+            """))
+            crops = [dict(r._mapping) for r in crop_summary]
+
+            # Latest prices for every crop (most recent date)
+            latest_prices = await session.execute(text("""
+                SELECT mp.date, mp.crop, mp.mandi, mp.district,
+                       mp.modal_price, mp.min_price, mp.max_price,
+                       mp.arrival_quantity_qtl, mp.source
+                FROM mandi_prices mp
+                INNER JOIN (
+                    SELECT crop, MAX(date) AS max_date
+                    FROM mandi_prices
+                    GROUP BY crop
+                ) latest ON mp.crop = latest.crop AND mp.date = latest.max_date
+                ORDER BY mp.crop, mp.modal_price DESC
+            """))
+            prices = [dict(r._mapping) for r in latest_prices]
+
+        await engine.dispose()
+        return {
+            "status": "ok",
+            "total_crops": len(crops),
+            "crop_summary": crops,
+            "latest_prices_per_crop": prices,
+        }
+    except Exception as e:
+        logger.error("Price data query failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
 
 
 if __name__ == "__main__":
