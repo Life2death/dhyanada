@@ -221,7 +221,17 @@ async def receive_message(request: Request):
             logger.info(f"📱 Message from {msg.from_phone}: {msg_preview}")
 
             try:
-                # Classify intent
+                # Onboarding check FIRST — before intent classification.
+                # handle() returns "" only for active farmers; any other state
+                # means the user is mid-onboarding and we must reply immediately.
+                from src.handlers.onboarding import handle as onboarding_handle
+                onboarding_reply = await onboarding_handle(msg.from_phone, msg.text or "")
+                if onboarding_reply:
+                    await whatsapp.send_text_message(msg.from_phone, onboarding_reply)
+                    logger.info(f"✅ Sent onboarding reply to {msg.from_phone}")
+                    continue
+
+                # Classify intent (only reached for active/registered farmers)
                 result_dict = await handle_message(msg)
                 intent_type = Intent(result_dict.get("intent", "unknown"))
 
@@ -443,14 +453,6 @@ async def receive_message(request: Request):
                                 reply = "❌ सदस्यता अपडेट केली गेली नाही. कृपया पुनः प्रयत्न करा."
                             await whatsapp.send_text_message(msg.from_phone, reply)
                             logger.info(f"✅ Unsubscribed farmer {msg.from_phone}")
-
-                    # Onboarding / help / greeting / feedback
-                    elif intent_type == Intent.ONBOARDING:
-                        from src.handlers.onboarding import handle
-                        # Start onboarding state machine with empty input (will return first message)
-                        reply = await handle(msg.from_phone, "")
-                        await whatsapp.send_text_message(msg.from_phone, reply)
-                        logger.info(f"✅ Sent onboarding to {msg.from_phone}")
 
                     elif intent_type == Intent.HELP:
                         help_msg = (
