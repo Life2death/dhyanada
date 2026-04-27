@@ -37,19 +37,33 @@ def from_awaiting_consent(ctx: OnboardingContext, user_input: str) -> tuple[Onbo
         return ctx, reply
 
 
+_DISTRICTS_WITH_VILLAGE = {"ahilyanagar"}
+
+_AHILYANAGAR_TALUKAS: dict[str, str] = {
+    "ahmednagar": "Ahmednagar", "ahilyanagar": "Ahmednagar", "nagar": "Ahmednagar",
+    "akola": "Akola", "jamkhed": "Jamkhed", "karjat": "Karjat",
+    "kopargaon": "Kopargaon", "nevasa": "Nevasa", "newasa": "Nevasa",
+    "parner": "Parner", "pathardi": "Pathardi", "rahata": "Rahata",
+    "rahuri": "Rahuri", "sangamner": "Sangamner", "shevgaon": "Shevgaon",
+    "shrigonda": "Shrigonda", "shrirampur": "Shrirampur",
+}
+
+
 def from_awaiting_name(ctx: OnboardingContext, user_input: str) -> tuple[OnboardingContext, str]:
     """AWAITING_NAME → AWAITING_DISTRICT."""
     ctx.name = user_input.strip()[:100]
     ctx.state = OnboardingState.AWAITING_DISTRICT
     reply = (
-        f"धन्यवाद, {ctx.name}! आप कोणत्या जिल्ह्यातून आहात?\n"
-        f"पुणे, अहिल्यानगर, नवी मुंबई, मुंबई, नाशिक — Which district?"
+        f"अरे वाह! स्वागत आहे {ctx.name}! 🌾\n"
+        f"तुमचा जिल्हा कोणता आहे?\n\n"
+        f"Welcome {ctx.name}! Great to have you here! 🌾\n"
+        "Which district? पुणे / अहिल्यानगर / नाशिक / Pune / Ahilyanagar / Nashik / Mumbai"
     )
     return ctx, reply
 
 
 def from_awaiting_district(ctx: OnboardingContext, user_input: str) -> tuple[OnboardingContext, str]:
-    """AWAITING_DISTRICT → AWAITING_CROPS or stay in AWAITING_DISTRICT."""
+    """AWAITING_DISTRICT → AWAITING_TALUKA (Ahilyanagar) or AWAITING_CROPS (others)."""
     district = normalize_district(user_input)
     if not district:
         reply = (
@@ -59,11 +73,51 @@ def from_awaiting_district(ctx: OnboardingContext, user_input: str) -> tuple[Onb
         )
         return ctx, reply
     ctx.district = district
+    name = ctx.name or "आपण"
+    if district in _DISTRICTS_WITH_VILLAGE:
+        ctx.state = OnboardingState.AWAITING_TALUKA
+        taluka_list = " / ".join(sorted(set(_AHILYANAGAR_TALUKAS.values())))
+        reply = (
+            f"छान {name}! अहिल्यानगर जिल्ह्यातील तुमचा तालुका कोणता?\n\n"
+            f"Great {name}! Which taluka in Ahilyanagar district?\n{taluka_list}"
+        )
+    else:
+        ctx.state = OnboardingState.AWAITING_CROPS
+        reply = (
+            f"छान! आप कोणत्या पीक विषयी भाव पाहू इच्छिता?\n"
+            f"उदा: कांदा, तूर, सोयाबीन, कपास, टोमॅटो, गहू.\n"
+            f"एक किंवा अधिक पाठवा (हिंगलिश: onion tur soyabean)."
+        )
+    return ctx, reply
+
+
+def from_awaiting_taluka(ctx: OnboardingContext, user_input: str) -> tuple[OnboardingContext, str]:
+    """AWAITING_TALUKA → AWAITING_VILLAGE or stay."""
+    canonical = _AHILYANAGAR_TALUKAS.get(user_input.strip().lower())
+    if not canonical:
+        taluka_list = " / ".join(sorted(set(_AHILYANAGAR_TALUKAS.values())))
+        return ctx, (
+            "तालुका ओळखता आला नाही.\n"
+            f"Taluka not recognised. Please send one of:\n{taluka_list}"
+        )
+    ctx.taluka = canonical
+    ctx.state = OnboardingState.AWAITING_VILLAGE
+    reply = (
+        f"तुमचे गाव नाव पाठवा ({canonical} तालुका).\n"
+        f"Please send your village name ({canonical} taluka)."
+    )
+    return ctx, reply
+
+
+def from_awaiting_village(ctx: OnboardingContext, user_input: str) -> tuple[OnboardingContext, str]:
+    """AWAITING_VILLAGE → AWAITING_CROPS."""
+    ctx.village_name = user_input.strip()[:100]
     ctx.state = OnboardingState.AWAITING_CROPS
     reply = (
-        f"छान! आप कोणत्या पीक विषयी भाव पाहू इच्छिता?\n"
-        f"उदा: कांदा, तूर, सोयाबीन, कपास, टोमॅटो, गहू.\n"
-        f"एक किंवा अधिक पाठवा (हिंगलिश: onion tur soyabean)."
+        f"छान! {ctx.village_name} गाव नोंदवले.\n"
+        f"कोणती पिके? उदा: कांदा, तूर, सोयाबीन.\n\n"
+        f"Village {ctx.village_name} saved!\n"
+        "Which crops? E.g.: onion tur soyabean"
     )
     return ctx, reply
 

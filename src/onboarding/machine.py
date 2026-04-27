@@ -49,6 +49,10 @@ class OnboardingMachine:
             ctx, reply = transitions.from_awaiting_name(ctx, user_input)
         elif ctx.state == OnboardingState.AWAITING_DISTRICT:
             ctx, reply = transitions.from_awaiting_district(ctx, user_input)
+        elif ctx.state == OnboardingState.AWAITING_TALUKA:
+            ctx, reply = transitions.from_awaiting_taluka(ctx, user_input)
+        elif ctx.state == OnboardingState.AWAITING_VILLAGE:
+            ctx, reply = transitions.from_awaiting_village(ctx, user_input)
         elif ctx.state == OnboardingState.AWAITING_CROPS:
             ctx, reply = transitions.from_awaiting_crops(ctx, user_input)
         elif ctx.state == OnboardingState.AWAITING_LANGUAGE:

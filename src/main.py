@@ -251,13 +251,24 @@ async def receive_message(request: Request):
                     # Weather query (Phase 2 Module 1)
                     if intent_type == Intent.WEATHER_QUERY:
                         handler = WeatherHandler(session)
-                        # Use farmer's district from profile, or default to "pune"
                         farmer_district = farmer.district if farmer else "pune"
                         farmer_language = farmer.preferred_language if farmer else "mr"
+                        # If farmer has a village, fetch its coordinates for live fallback
+                        farmer_lat = farmer_lon = None
+                        if farmer and farmer.village_id:
+                            from sqlalchemy import text as sql_text
+                            row = (await session.execute(
+                                sql_text("SELECT latitude, longitude FROM villages WHERE id = :id"),
+                                {"id": farmer.village_id},
+                            )).fetchone()
+                            if row:
+                                farmer_lat, farmer_lon = row[0], row[1]
                         reply = await handler.handle(
                             intent_result,
                             farmer_apmc=farmer_district,
                             farmer_language=farmer_language,
+                            farmer_lat=farmer_lat,
+                            farmer_lon=farmer_lon,
                         )
                         await whatsapp.send_text_message(msg.from_phone, reply)
                         logger.info(f"✅ Sent weather reply to {msg.from_phone}")

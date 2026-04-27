@@ -13,6 +13,8 @@ class OnboardingState(str, Enum):
     AWAITING_CONSENT = "awaiting_consent"
     AWAITING_NAME = "awaiting_name"
     AWAITING_DISTRICT = "awaiting_district"
+    AWAITING_TALUKA = "awaiting_taluka"  # taluka within district (Ahilyanagar PoC)
+    AWAITING_VILLAGE = "awaiting_village"  # village within taluka
     AWAITING_CROPS = "awaiting_crops"
     AWAITING_LANGUAGE = "awaiting_language"
     ACTIVE = "active"                   # complete → write to Postgres
@@ -30,6 +32,9 @@ class OnboardingContext:
     consent_given: bool = False
     name: Optional[str] = None
     district: Optional[str] = None        # canonical slug: pune, ahilyanagar, ...
+    taluka: Optional[str] = None          # taluka name (Ahilyanagar district PoC)
+    village_id: Optional[int] = None      # FK → villages.id (if matched)
+    village_name: Optional[str] = None    # free-text or matched village name
     crops: list[str] = field(default_factory=list)  # canonical slugs
     preferred_language: str = "mr"        # mr | en
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))

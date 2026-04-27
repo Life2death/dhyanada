@@ -8,6 +8,7 @@ from sqlalchemy.sql import func
 from src.models.base import Base
 
 
+
 class Farmer(Base):
     __tablename__ = "farmers"
 
@@ -16,6 +17,8 @@ class Farmer(Base):
     name: Mapped[Optional[str]] = mapped_column(String(100))
     age: Mapped[Optional[int]] = mapped_column(Integer)  # Farmer's age (for scheme eligibility)
     district: Mapped[Optional[str]] = mapped_column(String(50))
+    taluka: Mapped[Optional[str]] = mapped_column(String(100))
+    village_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("villages.id"), nullable=True)
     land_hectares: Mapped[Optional[float]] = mapped_column(Numeric(precision=8, scale=2))  # Farm size in hectares
     preferred_language: Mapped[str] = mapped_column(String(10), default="mr")
     plan_tier: Mapped[str] = mapped_column(String(20), default="free")

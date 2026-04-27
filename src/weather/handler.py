@@ -30,13 +30,17 @@ class WeatherHandler:
         intent: IntentResult,
         farmer_apmc: Optional[str] = None,
         farmer_language: str = "mr",
+        farmer_lat: Optional[float] = None,
+        farmer_lon: Optional[float] = None,
     ) -> str:
         """Process a WEATHER_QUERY intent and return formatted reply.
 
         Args:
-            intent: IntentResult from classifier (must have intent=WEATHER_QUERY)
-            farmer_apmc: Farmer's registered APMC (used if not in intent)
+            intent: IntentResult from classifier
+            farmer_apmc: Farmer's registered APMC / district slug
             farmer_language: Farmer's preferred language ("mr" or "en")
+            farmer_lat: Village latitude for coordinate-based fallback
+            farmer_lon: Village longitude for coordinate-based fallback
 
         Returns:
             Formatted WhatsApp reply message
@@ -45,29 +49,23 @@ class WeatherHandler:
             logger.error("WeatherHandler: wrong intent type: %s", intent.intent)
             return "Error: expected WEATHER_QUERY intent"
 
-        # If metric not extracted, ask for clarification
         if not intent.commodity:
             reply = format_weather_not_extracted(lang=farmer_language)
             logger.info("WeatherHandler: metric not extracted, asking for clarification")
             return reply
 
-        # Build query
         query = WeatherQuery(
-            metric=intent.commodity,  # e.g., "temperature", "rainfall"
+            metric=intent.commodity,
             apmc=intent.district or farmer_apmc,
         )
 
         logger.info(
-            "WeatherHandler: querying metric=%s apmc=%s",
-            query.metric,
-            query.apmc,
+            "WeatherHandler: querying metric=%s apmc=%s lat=%s lon=%s",
+            query.metric, query.apmc, farmer_lat, farmer_lon,
         )
 
-        # Query weather data
-        result = await self.repo.query(query)
+        result = await self.repo.query(query, lat=farmer_lat, lon=farmer_lon)
 
-        # Format reply
         reply = format_weather_reply(result, lang=farmer_language)
-
         logger.info("WeatherHandler: generated reply (%d chars)", len(reply))
         return reply

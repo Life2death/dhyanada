@@ -29,6 +29,8 @@ VALID_STATES = [
     "awaiting_consent",
     "awaiting_name",
     "awaiting_district",
+    "awaiting_taluka",
+    "awaiting_village",
     "awaiting_crops",
     "awaiting_language",
     "active",
@@ -41,6 +43,27 @@ VALID_DISTRICTS = {"latur", "nanded", "jalna", "akola", "yavatmal"}
 VALID_CROPS = {"soyabean", "tur", "cotton"}
 VALID_LANGUAGES = {"mr", "en"}
 CONSENT_VERSION = "1.0"
+
+# Talukas in Ahilyanagar district (canonical → display)
+_AHILYANAGAR_TALUKAS: dict[str, str] = {
+    "ahmednagar": "Ahmednagar", "ahilyanagar": "Ahmednagar", "nagar": "Ahmednagar",
+    "akola": "Akola",
+    "jamkhed": "Jamkhed",
+    "karjat": "Karjat",
+    "kopargaon": "Kopargaon",
+    "nevasa": "Nevasa", "newasa": "Nevasa",
+    "parner": "Parner",
+    "pathardi": "Pathardi",
+    "rahata": "Rahata",
+    "rahuri": "Rahuri",
+    "sangamner": "Sangamner",
+    "shevgaon": "Shevgaon",
+    "shrigonda": "Shrigonda",
+    "shrirampur": "Shrirampur",
+}
+
+# Districts where we collect taluka+village (PoC: Ahilyanagar only)
+_DISTRICTS_WITH_VILLAGE = {"ahilyanagar"}
 
 # Redis TTL: 24 hours (in-progress onboarding sessions)
 SESSION_TTL = 86_400
@@ -67,6 +90,9 @@ class OnboardingSession:
     state: str = "new"
     name: Optional[str] = None
     district: Optional[str] = None
+    taluka: Optional[str] = None
+    village_id: Optional[int] = None
+    village_name: Optional[str] = None
     crops: list[str] = field(default_factory=list)
     preferred_language: str = "mr"
     consent_given: bool = False
@@ -140,6 +166,12 @@ async def handle(phone: str, text: str) -> str:
     if state == "awaiting_district":
         return await _handle_district(phone, session, msg)
 
+    if state == "awaiting_taluka":
+        return await _handle_taluka(phone, session, msg)
+
+    if state == "awaiting_village":
+        return await _handle_village(phone, session, msg)
+
     if state == "awaiting_crops":
         return await _handle_crops(phone, session, msg)
 
@@ -198,48 +230,116 @@ async def _handle_consent(phone: str, session: OnboardingSession, msg: str) -> s
 async def _handle_name(phone: str, session: OnboardingSession, msg: str) -> str:
     if len(msg) < 2 or len(msg) > 100:
         return "कृपया वैध नाव पाठवा. / Please send a valid name (2–100 characters)."
-    session.name = msg
+    session.name = msg.strip()
     session.state = "awaiting_district"
     await save_session(session)
     return (
-        f"नमस्कार {msg}! तुमचा जिल्हा कोणता?\n"
-        f"Hello {msg}! Which district are you from?\n"
-        "Latur / Nanded / Jalna / Akola / Yavatmal"
+        f"अरे वाह! स्वागत आहे {msg}! 🌾\n"
+        f"तुमचा जिल्हा कोणता आहे?\n\n"
+        f"Welcome {msg}! Great to have you here! 🌾\n"
+        f"Which district are you from?\n"
+        "पुणे / अहिल्यानगर / नाशिक / Pune / Ahilyanagar / Nashik / Mumbai"
     )
 
 
 async def _handle_district(phone: str, session: OnboardingSession, msg: str) -> str:
-    from src.router.intent import _extract_entity, DISTRICT_MAP  # avoid circular at module level
+    from src.ingestion.normalizer import normalize_district
 
-    canonical = _extract_entity(msg, DISTRICT_MAP)
+    canonical = normalize_district(msg)
     if not canonical:
         return (
-            "जिल्हा ओळखता आला नाही.\n"
-            "Could not recognise district. Please send one of:\n"
-            "Latur / Nanded / Jalna / Akola / Yavatmal"
+            "जिल्हा ओळखता आला नाही. कृपया पुन्हा प्रयत्न करा.\n"
+            "Could not recognise district. Please try:\n"
+            "पुणे / अहिल्यानगर / नाशिक / Pune / Ahilyanagar / Nashik / Mumbai"
         )
     session.district = canonical
+    name = session.name or "आपण"
+
+    if canonical in _DISTRICTS_WITH_VILLAGE:
+        session.state = "awaiting_taluka"
+        await save_session(session)
+        taluka_list = " / ".join(sorted(set(_AHILYANAGAR_TALUKAS.values())))
+        return (
+            f"छान {name}! अहिल्यानगर जिल्ह्यातील तुमचा तालुका कोणता?\n\n"
+            f"Great {name}! Which taluka in Ahilyanagar district?\n"
+            f"{taluka_list}"
+        )
+
     session.state = "awaiting_crops"
     await save_session(session)
     return (
-        "कोणती पिके? (एकापेक्षा जास्त असल्यास स्वल्पविरामाने पाठवा)\n"
-        "Which crops? (send comma-separated if more than one)\n"
-        "Soyabean / Tur / Cotton"
+        f"छान {name}! कोणती पिके?\n"
+        "Which crops? (comma-separated if more than one)\n"
+        "Soyabean / Tur / Cotton / Onion / Wheat"
+    )
+
+
+async def _handle_taluka(phone: str, session: OnboardingSession, msg: str) -> str:
+    """AWAITING_TALUKA — validate and save taluka, then ask for village."""
+    raw = msg.strip().lower()
+    canonical_taluka = _AHILYANAGAR_TALUKAS.get(raw)
+    if not canonical_taluka:
+        taluka_list = " / ".join(sorted(set(_AHILYANAGAR_TALUKAS.values())))
+        return (
+            "तालुका ओळखता आला नाही. कृपया खालीलपैकी एक पाठवा:\n"
+            f"Taluka not recognised. Please send one of:\n{taluka_list}"
+        )
+    session.taluka = canonical_taluka
+    session.state = "awaiting_village"
+    await save_session(session)
+
+    # Fetch villages for this taluka from DB
+    villages = await _fetch_villages_for_taluka(canonical_taluka, "ahilyanagar")
+    if villages:
+        village_list = "\n".join(f"• {v['name']}" for v in villages[:15])
+        return (
+            f"तुमचे गाव कोणते? {canonical_taluka} तालुक्यातील गावे:\n\n"
+            f"Which village? Villages in {canonical_taluka} taluka:\n"
+            f"{village_list}\n\n"
+            f"(तुमचे गाव नसल्यास जवळचे गाव पाठवा / Send nearest village if yours isn't listed)"
+        )
+    return (
+        f"तुमचे गाव नाव पाठवा ({canonical_taluka} तालुका).\n"
+        f"Please send your village name ({canonical_taluka} taluka)."
+    )
+
+
+async def _handle_village(phone: str, session: OnboardingSession, msg: str) -> str:
+    """AWAITING_VILLAGE — look up village in DB and save, then move to crops."""
+    raw_name = msg.strip()
+    village = await _lookup_village(raw_name, session.taluka, "ahilyanagar")
+    if village:
+        session.village_id = village["id"]
+        session.village_name = village["name"]
+    else:
+        # Accept free-text village name even if not in DB
+        session.village_name = raw_name[:100]
+
+    name = session.name or "आपण"
+    session.state = "awaiting_crops"
+    await save_session(session)
+    village_display = session.village_name or raw_name
+    return (
+        f"छान! {village_display} गाव नोंदवले.\n"
+        f"कोणती पिके? (comma-separated)\n\n"
+        f"Village {village_display} saved, {name}!\n"
+        "Which crops are you interested in?\n"
+        "Soyabean / Tur / Cotton / Onion / Wheat / Pomegranate"
     )
 
 
 async def _handle_crops(phone: str, session: OnboardingSession, msg: str) -> str:
-    from src.router.intent import _extract_entity, CROP_MAP
+    from src.ingestion.normalizer import normalize_commodity
 
-    parts = [p.strip() for p in msg.replace(",", " ").split()]
-    crops = {_extract_entity(p, CROP_MAP) for p in parts if _extract_entity(p, CROP_MAP)}
+    parts = [p.strip() for p in msg.replace(",", " ").split() if p.strip()]
+    crops = [c for c in (normalize_commodity(p) for p in parts) if c]
 
     if not crops:
         return (
-            "पीक ओळखता आले नाही.\n"
-            "Could not recognise crop. Please send: Soyabean / Tur / Cotton"
+            "पीक ओळखता आले नाही. कृपया पुन्हा प्रयत्न करा.\n"
+            "Could not recognise crop. Try: Soyabean / Tur / Cotton / Onion / Wheat"
         )
-    session.crops = list(crops)
+    session.crops = list(dict.fromkeys(crops))  # dedupe preserving order
     session.state = "awaiting_language"
     await save_session(session)
     return (
@@ -372,6 +472,8 @@ async def _persist_to_db(session: OnboardingSession) -> None:
                     phone=session.phone,
                     name=session.name,
                     district=session.district,
+                    taluka=session.taluka,
+                    village_id=session.village_id,
                     preferred_language=session.preferred_language,
                     subscription_status="active",
                     onboarding_state="active",
@@ -384,6 +486,8 @@ async def _persist_to_db(session: OnboardingSession) -> None:
                 # Update existing farmer
                 farmer.name = session.name
                 farmer.district = session.district
+                farmer.taluka = session.taluka
+                farmer.village_id = session.village_id
                 farmer.preferred_language = session.preferred_language
                 farmer.subscription_status = "active"
                 farmer.onboarding_state = "active"
@@ -483,6 +587,56 @@ async def _log_consent_event(phone: str, event_type: str) -> None:
             "Error logging consent event for phone=%s type=%s: %s",
             phone, event_type, e,
         )
+
+
+# ---------------------------------------------------------------------------
+# Village DB helpers
+# ---------------------------------------------------------------------------
+
+async def _fetch_villages_for_taluka(taluka: str, district_slug: str) -> list[dict]:
+    """Return list of {id, name} for villages in the given taluka."""
+    try:
+        from sqlalchemy import text as sql_text
+        db = await _get_db_session()
+        async with db:
+            result = await db.execute(
+                sql_text(
+                    "SELECT id, village_name FROM villages "
+                    "WHERE taluka_name = :taluka AND district_slug = :ds "
+                    "ORDER BY village_name"
+                ),
+                {"taluka": taluka, "ds": district_slug},
+            )
+            return [{"id": row[0], "name": row[1]} for row in result.fetchall()]
+    except Exception as exc:
+        logger.error("_fetch_villages_for_taluka: %s", exc)
+        return []
+
+
+async def _lookup_village(name: str, taluka: str | None, district_slug: str) -> dict | None:
+    """Return {id, name, lat, lon} for best-match village, or None."""
+    try:
+        from sqlalchemy import text as sql_text
+        db = await _get_db_session()
+        async with db:
+            params: dict = {"name": name, "ds": district_slug}
+            where = "LOWER(village_name) = LOWER(:name) AND district_slug = :ds"
+            if taluka:
+                where += " AND taluka_name = :taluka"
+                params["taluka"] = taluka
+            result = await db.execute(
+                sql_text(
+                    f"SELECT id, village_name, latitude, longitude FROM villages "
+                    f"WHERE {where} LIMIT 1"
+                ),
+                params,
+            )
+            row = result.fetchone()
+            if row:
+                return {"id": row[0], "name": row[1], "lat": row[2], "lon": row[3]}
+    except Exception as exc:
+        logger.error("_lookup_village: %s", exc)
+    return None
 
 
 # ---------------------------------------------------------------------------

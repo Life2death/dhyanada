@@ -1,4 +1,5 @@
 from src.models.base import Base
+from src.models.village import Village
 from src.models.farmer import Farmer, CropOfInterest
 from src.models.farmer_session import FarmerSession
 from src.models.price import MandiPrice
@@ -14,6 +15,7 @@ from src.models.weather import WeatherObservation
 
 __all__ = [
     "Base",
+    "Village",
     "Farmer",
     "CropOfInterest",
     "FarmerSession",
