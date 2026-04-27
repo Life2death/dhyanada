@@ -15,6 +15,8 @@ class Farmer(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String(100))
+    first_name: Mapped[Optional[str]] = mapped_column(String(50))
+    last_name: Mapped[Optional[str]] = mapped_column(String(50))
     age: Mapped[Optional[int]] = mapped_column(Integer)  # Farmer's age (for scheme eligibility)
     district: Mapped[Optional[str]] = mapped_column(String(50))
     taluka: Mapped[Optional[str]] = mapped_column(String(100))
