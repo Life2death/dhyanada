@@ -43,7 +43,8 @@ _LEGACY_STATE_MAP: dict[str, str] = {
     "awaiting_district":   "awaiting_location",
     "awaiting_taluka":     "awaiting_location",
     "awaiting_village":    "awaiting_location",
-    "awaiting_language":   "awaiting_crops",
+    "awaiting_crops":      "awaiting_location",
+    "awaiting_language":   "awaiting_location",
 }
 
 _engine = None
@@ -164,9 +165,6 @@ async def handle(phone: str, text: str) -> str:
     if session.state == "awaiting_location":
         return await _handle_location(phone, session, msg)
 
-    if session.state == "awaiting_crops":
-        return await _handle_crops(phone, session, msg)
-
     if session.state == "active":
         return ""
 
@@ -274,8 +272,9 @@ async def _handle_location(phone: str, session: OnboardingSession, msg: str) -> 
     raw_district = loc.get("district") or ""
     session.district = normalize_district(raw_district) or (raw_district[:50] or None)
 
-    session.state = "awaiting_crops"
-    await save_session(session)
+    session.state = "active"
+    await _persist_to_db(session)
+    await delete_session(phone)
 
     parts = [village]
     if session.taluka:
@@ -283,14 +282,15 @@ async def _handle_location(phone: str, session: OnboardingSession, msg: str) -> 
     if session.district:
         parts.append(session.district)
     loc_display = ", ".join(parts)
+    name = session.display_name
 
     return (
-        f"✅ स्थान नोंदवले: *{loc_display}*\n\n"
-        "आता तुम्ही कोणती *पिके* घेतात ते सांगा.\n"
-        "उदा: *कांदा, सोयाबीन, तूर, गहू, डाळिंब*\n\n"
-        f"Location saved: *{loc_display}*\n"
-        "Which *crops* do you grow?\n"
-        "E.g: *onion, soyabean, tur, wheat, pomegranate*"
+        f"🎉 नोंदणी पूर्ण झाली, *{name}*!\n"
+        f"📍 गाव: {loc_display}\n\n"
+        "दर रोज सकाळी ७ वाजता शेतकरी माहिती पत्र मिळेल. 🌾\n"
+        "'भाव' पाठवून मंडी भाव, 'हवामान' पाठवून हवामान विचारा.\n\n"
+        f"Registration complete, {name}! 📍 {loc_display}\n"
+        "You'll get the daily farmer brief every morning at 7 AM. 🌾"
     )
 
 
