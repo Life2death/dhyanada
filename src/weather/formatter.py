@@ -46,9 +46,9 @@ def format_weather_reply(result: WeatherQueryResult, lang: str = "mr") -> str:
         return "Weather data not available today. Please try again."
 
     record = result.record
-    metric_display = _METRIC_MARATHI.get(record.metric, record.metric.replace("_", " "))
 
     if lang == "mr":
+        metric_display = _METRIC_MARATHI.get(record.metric, record.metric.replace("_", " "))
         reply = (
             f"🌤️ {metric_display} — {record.apmc.title()}\n"
             f"मूल्य: {record.value_str} {record.unit}\n"
@@ -67,8 +67,9 @@ def format_weather_reply(result: WeatherQueryResult, lang: str = "mr") -> str:
             reply += "(⚠️ ३-४ तास पुरानो डेटा)\n"
 
     else:  # English
+        metric_display = record.metric.replace("_", " ").title()
         reply = (
-            f"🌤️ {metric_display.title()} — {record.apmc.title()}\n"
+            f"🌤️ {metric_display} — {record.apmc.title()}\n"
             f"Value: {record.value_str} {record.unit}\n"
         )
 

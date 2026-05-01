@@ -115,7 +115,10 @@ async def handle_message(message: IncomingMessage) -> Dict[str, Any]:
 
     # Phase 2 Module 2: Handle audio messages
     if message.is_audio():
-        if not message.media_url:
+        if message.text:
+            # Text already set (pre-transcribed) — skip network transcription
+            pass
+        elif not message.media_url:
             logger.error("handle_message: audio message missing media_url")
             return {
                 "status": "audio_error",
@@ -123,33 +126,28 @@ async def handle_message(message: IncomingMessage) -> Dict[str, Any]:
                 "intent": Intent.UNKNOWN.value,
                 "error": "Missing media URL for audio transcription",
             }
+        else:
+            try:
+                transcriber_config = {
+                    "google_speech_api_key": settings.google_speech_api_key,
+                    "google_speech_language_code": settings.google_speech_language_code,
+                    "voice_transcription_timeout": settings.voice_transcription_timeout,
+                    "openai_api_key": settings.openai_api_key,
+                }
+                transcriber = VoiceTranscriber(transcriber_config)
+                result = await transcriber.transcribe(message.media_url)
+                message.text = result.text
+                message.voice_transcription = result.text
+                logger.info(f"✅ Transcribed audio to text: {result.text[:50]}...")
 
-        try:
-            # Initialize transcriber with config
-            transcriber_config = {
-                "google_speech_api_key": settings.google_speech_api_key,
-                "google_speech_language_code": settings.google_speech_language_code,
-                "voice_transcription_timeout": settings.voice_transcription_timeout,
-                "openai_api_key": settings.openai_api_key,
-            }
-            transcriber = VoiceTranscriber(transcriber_config)
-
-            # Transcribe audio to text
-            result = await transcriber.transcribe(message.media_url)
-            message.text = result.text
-            message.voice_transcription = result.text  # Store for audit trail
-
-            logger.info(f"✅ Transcribed audio to text: {result.text[:50]}...")
-
-        except TranscriptionError as e:
-            logger.error(f"❌ Audio transcription failed: {e}")
-            # Don't block message processing - return error status
-            return {
-                "status": "transcription_failed",
-                "message_id": message.message_id,
-                "intent": Intent.UNKNOWN.value,
-                "error": str(e),
-            }
+            except TranscriptionError as e:
+                logger.error(f"❌ Audio transcription failed: {e}")
+                return {
+                    "status": "transcription_failed",
+                    "message_id": message.message_id,
+                    "intent": Intent.UNKNOWN.value,
+                    "error": str(e),
+                }
 
     # Phase 2 Module 3: Handle image messages for pest diagnosis
     if message.is_image():
@@ -171,10 +169,10 @@ async def handle_message(message: IncomingMessage) -> Dict[str, Any]:
             "source": "image",
         }
 
-    # Regular text messages or transcribed audio
-    if not message.is_text() or not message.text:
-        # Non-audio, non-text, non-image messages (documents, location, etc.)
-        logger.info(f"⚠️  Non-text, non-audio, non-image message type: {message.message_type}")
+    # Regular text messages or transcribed audio — proceed if text is available
+    if not message.text:
+        # Unhandled message types (location, document, sticker, etc.)
+        logger.info(f"⚠️  No text content for message type: {message.message_type}")
         return {
             "status": "non_text",
             "message_id": message.message_id,

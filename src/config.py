@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     whatsapp_phone_id: str = ""
     whatsapp_token: str = ""
     whatsapp_app_secret: str = ""
-    whatsapp_verify_token: str = ""
+    whatsapp_verify_token: str = "dhanyada_webhook_token"
     whatsapp_app_id: str = ""
 
     # Database

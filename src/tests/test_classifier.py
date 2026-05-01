@@ -201,10 +201,11 @@ async def test_handle_text_message_classified():
 
 @pytest.mark.asyncio
 async def test_handle_non_text_message():
+    # A message type that isn't text/audio/image (e.g. location) with no text
     msg = IncomingMessage(
         from_phone="919876543210",
         message_id="msg002",
-        message_type="image",
+        message_type="location",
         text=None,
     )
     result = await handle_message(msg)

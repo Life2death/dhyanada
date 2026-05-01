@@ -25,7 +25,7 @@ class TestDistrict:
         assert normalize_district("Thane") == "navi_mumbai"
 
     def test_unknown_district(self):
-        assert normalize_district("Sangli") is None
+        assert normalize_district("Atlantis") is None
 
     def test_all_targets_are_slugs(self):
         for slug in TARGET_DISTRICTS:

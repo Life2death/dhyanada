@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from src.adapters.whatsapp import WhatsAppAdapter, WhatsAppConfig, init_adapter, get_adapter
 
 
@@ -38,13 +38,13 @@ def test_adapter_invalid_config():
 @pytest.mark.asyncio
 async def test_send_text_message(whatsapp_config, mock_pywa):
     """Test sending text message"""
-    mock_client = AsyncMock()
-    mock_client.send_message = AsyncMock(return_value="msg_123")
+    mock_client = MagicMock()
+    mock_client.send_message = MagicMock(return_value="msg_123")
     mock_pywa.return_value = mock_client
 
     adapter = WhatsAppAdapter(whatsapp_config)
     msg_id = await adapter.send_text_message(to="919876543210", text="Hello!")
-    
+
     assert msg_id == "msg_123"
     mock_client.send_message.assert_called_once()
 
@@ -52,8 +52,8 @@ async def test_send_text_message(whatsapp_config, mock_pywa):
 @pytest.mark.asyncio
 async def test_send_marathi_text(whatsapp_config, mock_pywa):
     """Test sending Marathi text message (UTF-8 support)"""
-    mock_client = AsyncMock()
-    mock_client.send_message = AsyncMock(return_value="msg_marathi_456")
+    mock_client = MagicMock()
+    mock_client.send_message = MagicMock(return_value="msg_marathi_456")
     mock_pywa.return_value = mock_client
 
     adapter = WhatsAppAdapter(whatsapp_config)
