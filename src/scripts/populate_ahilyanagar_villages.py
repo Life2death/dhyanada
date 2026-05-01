@@ -6,21 +6,20 @@ Usage:
     python -m src.scripts.populate_ahilyanagar_villages
 
 Strategy:
-    All Overpass queries are STRICTLY scoped inside the Ahilyanagar/Ahmadnagar
-    district boundary (admin_level=6). This prevents name collisions with other
-    Maharashtra districts that share taluka names (e.g. Akola district in Vidarbha).
+    1. ONE Overpass query fetches ALL villages inside the Ahilyanagar district
+       bounding box (no per-taluka area matching — avoids OSM taluka boundary
+       bleeding across districts).
+    2. Each village is assigned to its nearest taluka using centroid distance.
+    3. Clean slate: existing rows deleted before re-insert.
 
-    Query flow per taluka:
-      Q1 — taluka area scoped inside Ahilyanagar district boundary
-      Q2 — villages tagged is_in:district=Ahmadnagar inside district boundary
-      Q3 — all villages in district boundary, filtered by is_in:taluk tag
-      Fallback — taluka centroid only (single point)
-
-Expected runtime: ~5-8 minutes for all 14 talukas.
+Ahilyanagar bounding box (degrees):
+    South: 18.55  North: 20.10
+    West:  73.90  East:  75.65
 """
 import asyncio
 import json
 import logging
+import math
 import os
 import time
 import urllib.parse
@@ -41,24 +40,10 @@ logger = logging.getLogger(__name__)
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 
-# (canonical DB name, OSM search name)
-AHILYANAGAR_TALUKAS = [
-    ("Ahmednagar",  "Ahmadnagar"),
-    ("Akola",       "Akola"),
-    ("Jamkhed",     "Jamkhed"),
-    ("Karjat",      "Karjat"),
-    ("Kopargaon",   "Kopargaon"),
-    ("Nevasa",      "Nevasa"),
-    ("Parner",      "Parner"),
-    ("Pathardi",    "Pathardi"),
-    ("Rahata",      "Rahata"),
-    ("Rahuri",      "Rahuri"),
-    ("Sangamner",   "Sangamner"),
-    ("Shevgaon",    "Shevgaon"),
-    ("Shrigonda",   "Shrigonda"),
-    ("Shrirampur",  "Shrirampur"),
-]
+# Ahilyanagar district bounding box (tight — excludes adjacent districts)
+BBOX = (18.55, 73.90, 20.10, 75.65)   # south, west, north, east
 
+# Taluka centroids (lat, lon) — used for nearest-taluka assignment
 TALUKA_CENTROIDS = {
     "Ahmednagar":  (19.0948, 74.7480),
     "Akola":       (18.9667, 74.9833),
@@ -88,24 +73,44 @@ def get_database_url() -> str:
     return settings.database_url
 
 
-# ── Overpass helpers ──────────────────────────────────────────────────────────
+def nearest_taluka(lat: float, lon: float) -> str:
+    """Return the taluka name whose centroid is closest to (lat, lon)."""
+    def dist(c):
+        return math.hypot(lat - c[0], lon - c[1])
+    return min(TALUKA_CENTROIDS, key=lambda t: dist(TALUKA_CENTROIDS[t]))
 
-def _overpass_post(ql: str) -> dict:
+
+def fetch_all_villages() -> list[tuple[str, float, float]]:
+    """
+    Single Overpass bounding-box query → all villages in Ahilyanagar district.
+    Returns [(name, lat, lon), ...]
+    """
+    south, west, north, east = BBOX
+    bbox_str = f"{south},{west},{north},{east}"
+
+    ql = f"""
+[out:json][timeout:120];
+(
+  node["place"~"^(village|hamlet|town)$"]({bbox_str});
+  way["place"~"^(village|hamlet|town)$"]({bbox_str});
+);
+out center;
+"""
+    logger.info(f"Querying Overpass for bbox {bbox_str}...")
     data = urllib.parse.urlencode({"data": ql}).encode()
     req = urllib.request.Request(OVERPASS_URL, data=data, method="POST")
     req.add_header("User-Agent", "Dhyanada-VillageBot/1.0 (https://github.com/Life2death/dhyanada)")
     req.add_header("Content-Type", "application/x-www-form-urlencoded")
-    with urllib.request.urlopen(req, timeout=120) as resp:
-        return json.loads(resp.read().decode())
 
+    with urllib.request.urlopen(req, timeout=150) as resp:
+        result = json.loads(resp.read().decode())
 
-def _parse_result(result: dict) -> list[tuple[str, float, float]]:
     villages = []
     seen = set()
     for el in result.get("elements", []):
         tags = el.get("tags", {})
         name = tags.get("name:en") or tags.get("name")
-        if not name or name in seen:
+        if not name:
             continue
         if el["type"] == "node":
             lat, lon = el["lat"], el["lon"]
@@ -117,146 +122,63 @@ def _parse_result(result: dict) -> list[tuple[str, float, float]]:
                 continue
         else:
             continue
-        seen.add(name)
-        villages.append((name, float(lat), float(lon)))
+
+        key = (name.strip(), round(lat, 4), round(lon, 4))
+        if key in seen:
+            continue
+        seen.add(key)
+        villages.append((name.strip(), float(lat), float(lon)))
+
+    logger.info(f"Overpass returned {len(villages)} unique villages in bounding box")
     return villages
 
 
-def fetch_villages_for_taluka(canonical: str, osm_name: str) -> list[tuple[str, float, float]]:
-    """
-    All queries strictly scoped inside Ahilyanagar district boundary.
-    Returns [(village_name, lat, lon), ...]
-    """
-
-    # Q1: taluka area nested inside Ahilyanagar district
-    ql1 = f"""
-[out:json][timeout:90];
-area["name"~"Ahmadnagar|Ahilyanagar"]["admin_level"="6"]->.district;
-area["name"="{osm_name}"](area.district)->.taluka;
-(
-  node["place"~"^(village|hamlet|town)$"](area.taluka);
-  way["place"~"^(village|hamlet|town)$"](area.taluka);
-);
-out center;
-"""
-    try:
-        r = _overpass_post(ql1)
-        v = _parse_result(r)
-        if v:
-            logger.info(f"  Q1 → {len(v)} villages")
-            return v
-        logger.info(f"  Q1 → 0 villages, trying Q2...")
-    except Exception as e:
-        logger.warning(f"  Q1 failed: {e}, trying Q2...")
-
-    time.sleep(3)
-
-    # Q2: is_in:taluk tag inside district boundary
-    ql2 = f"""
-[out:json][timeout:90];
-area["name"~"Ahmadnagar|Ahilyanagar"]["admin_level"="6"]->.district;
-(
-  node["place"~"^(village|hamlet|town)$"]["is_in:taluk"="{osm_name}"](area.district);
-  way["place"~"^(village|hamlet|town)$"]["is_in:taluk"="{osm_name}"](area.district);
-);
-out center;
-"""
-    try:
-        r = _overpass_post(ql2)
-        v = _parse_result(r)
-        if v:
-            logger.info(f"  Q2 → {len(v)} villages")
-            return v
-        logger.info(f"  Q2 → 0 villages, trying Q3...")
-    except Exception as e:
-        logger.warning(f"  Q2 failed: {e}, trying Q3...")
-
-    time.sleep(3)
-
-    # Q3: search by taluka name in addr:subdistrict tag, still within district
-    ql3 = f"""
-[out:json][timeout:90];
-area["name"~"Ahmadnagar|Ahilyanagar"]["admin_level"="6"]->.district;
-(
-  node["place"~"^(village|hamlet|town)$"]["addr:subdistrict"="{osm_name}"](area.district);
-  way["place"~"^(village|hamlet|town)$"]["addr:subdistrict"="{osm_name}"](area.district);
-);
-out center;
-"""
-    try:
-        r = _overpass_post(ql3)
-        v = _parse_result(r)
-        if v:
-            logger.info(f"  Q3 → {len(v)} villages")
-            return v
-        logger.info(f"  Q3 → 0 villages, using centroid fallback")
-    except Exception as e:
-        logger.warning(f"  Q3 failed: {e}, using centroid fallback")
-
-    # Fallback: just the taluka centroid (single point)
-    lat, lon = TALUKA_CENTROIDS[canonical]
-    logger.warning(f"  Fallback → centroid ({lat}, {lon})")
-    return [(canonical, lat, lon)]
-
-
-# ── Database helpers ──────────────────────────────────────────────────────────
-
-async def cleanup_existing(session: AsyncSession) -> int:
-    """Delete ALL existing Ahilyanagar villages so we start fresh."""
-    result = await session.execute(
-        sql_text("DELETE FROM villages WHERE district_slug = 'ahilyanagar'")
-    )
-    await session.commit()
-    deleted = result.rowcount
-    logger.info(f"🗑️  Deleted {deleted} existing Ahilyanagar village rows")
-    return deleted
-
-
-async def populate_database() -> dict:
+async def populate_database(villages: list[tuple[str, float, float]]) -> dict:
     engine = create_async_engine(get_database_url())
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-    stats = {"inserted": 0, "failed": 0, "talukas_done": 0}
+    stats = {"inserted": 0, "failed": 0}
 
     try:
         async with async_session() as session:
-            # Always start clean to avoid stale/wrong data
-            await cleanup_existing(session)
+            # Clean slate
+            result = await session.execute(
+                sql_text("DELETE FROM villages WHERE district_slug = 'ahilyanagar'")
+            )
+            await session.commit()
+            logger.info(f"🗑️  Deleted {result.rowcount} existing rows")
 
-            for canonical, osm_name in AHILYANAGAR_TALUKAS:
-                logger.info(f"\n📍 {canonical} (OSM: {osm_name})")
+            # Insert all villages, assigning each to its nearest taluka
+            taluka_counts: dict[str, int] = {t: 0 for t in TALUKA_CENTROIDS}
+
+            for i, (vname, lat, lon) in enumerate(villages, 1):
+                taluka = nearest_taluka(lat, lon)
                 try:
-                    villages = await asyncio.to_thread(fetch_villages_for_taluka, canonical, osm_name)
+                    await session.execute(
+                        sql_text("""
+                            INSERT INTO villages
+                                (village_name, taluka_name, district_name, district_slug, latitude, longitude)
+                            VALUES (:vn, :tn, :dn, :ds, :lat, :lon)
+                            ON CONFLICT (village_name, taluka_name, district_slug)
+                            DO UPDATE SET latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude
+                        """),
+                        {"vn": vname, "tn": taluka,
+                         "dn": "Ahilyanagar", "ds": "ahilyanagar",
+                         "lat": lat, "lon": lon},
+                    )
+                    stats["inserted"] += 1
+                    taluka_counts[taluka] += 1
                 except Exception as e:
-                    logger.error(f"  Fetch failed entirely: {e} — using centroid")
-                    lat, lon = TALUKA_CENTROIDS[canonical]
-                    villages = [(canonical, lat, lon)]
+                    logger.error(f"  Insert failed for {vname}: {e}")
+                    stats["failed"] += 1
 
-                logger.info(f"  Inserting {len(villages)} rows...")
-                for vname, lat, lon in villages:
-                    try:
-                        await session.execute(
-                            sql_text("""
-                                INSERT INTO villages
-                                    (village_name, taluka_name, district_name, district_slug, latitude, longitude)
-                                VALUES (:vn, :tn, :dn, :ds, :lat, :lon)
-                                ON CONFLICT (village_name, taluka_name, district_slug)
-                                DO UPDATE SET latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude
-                            """),
-                            {"vn": vname, "tn": canonical,
-                             "dn": "Ahilyanagar", "ds": "ahilyanagar",
-                             "lat": lat, "lon": lon},
-                        )
-                        stats["inserted"] += 1
-                    except Exception as e:
-                        logger.error(f"  Insert failed for {vname}: {e}")
-                        stats["failed"] += 1
+                if i % 100 == 0:
+                    logger.info(f"  Progress: {i}/{len(villages)}")
 
-                await session.commit()
-                stats["talukas_done"] += 1
-                logger.info(f"  ✅ {canonical} committed ({len(villages)} rows)")
+            await session.commit()
 
-                # Polite delay between Overpass requests
-                time.sleep(3)
+            logger.info("\n  Villages assigned per taluka:")
+            for taluka, count in sorted(taluka_counts.items()):
+                logger.info(f"    {taluka:20s}: {count:4d}")
 
     finally:
         await engine.dispose()
@@ -288,22 +210,26 @@ async def verify_population() -> dict:
 
 async def main():
     logger.info("=" * 70)
-    logger.info("🌾 Ahilyanagar Villages — Strict District-Scoped Population")
+    logger.info("🌾 Ahilyanagar Villages — Bounding Box + Nearest Taluka")
     logger.info("=" * 70)
-    logger.info("All queries scoped inside Ahilyanagar district boundary (admin_level=6)")
-    logger.info(f"Talukas: {len(AHILYANAGAR_TALUKAS)}\n")
+    logger.info(f"Bounding box: {BBOX}")
+    logger.info(f"Talukas: {len(TALUKA_CENTROIDS)}\n")
 
-    stats = await populate_database()
+    # Step 1: Fetch all villages in one shot
+    villages = await asyncio.to_thread(fetch_all_villages)
 
-    logger.info("\n📈 Population Stats:")
-    logger.info(f"   Talukas done : {stats['talukas_done']}/14")
-    logger.info(f"   Rows inserted: {stats['inserted']}")
-    logger.info(f"   Rows failed  : {stats['failed']}")
+    # Step 2: Populate with nearest-taluka assignment
+    stats = await populate_database(villages)
+
+    logger.info(f"\n📈 Population Stats:")
+    logger.info(f"   Total fetched : {len(villages)}")
+    logger.info(f"   Rows inserted : {stats['inserted']}")
+    logger.info(f"   Rows failed   : {stats['failed']}")
 
     logger.info("\n⏳ Waiting 10 seconds before verification...")
     await asyncio.sleep(10)
 
-    logger.info("\n🔍 Verification (live DB count):")
+    logger.info("\n🔍 Verification (live DB):")
     v = await verify_population()
     logger.info(f"   Total villages in DB: {v['total']}")
     logger.info("\n   By Taluka:")
