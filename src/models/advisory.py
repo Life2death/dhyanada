@@ -45,6 +45,7 @@ class Advisory(Base):
     source_citation: Mapped[Optional[str]] = mapped_column(String(200))
 
     delivered_via: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)  # {"dashboard": true, "whatsapp": "msg_id"}
+    ai_insights: Mapped[Optional[dict[str, Any]]] = mapped_column(JSON)  # AI-generated crop-specific guidance (Phase 1)
     dismissed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

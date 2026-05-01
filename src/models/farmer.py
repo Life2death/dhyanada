@@ -31,6 +31,10 @@ class Farmer(Base):
     consent_given_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     consent_version: Mapped[Optional[str]] = mapped_column(String(10))
     erasure_requested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    # Village confirmation tracking (Phase 1)
+    village_confirmation_count: Mapped[int] = mapped_column(Integer, default=0)
+    village_locked: Mapped[bool] = mapped_column(Integer, default=False)
+    village_confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

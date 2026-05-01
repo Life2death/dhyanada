@@ -11,13 +11,16 @@ from __future__ import annotations
 import logging
 from datetime import date, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.weather import WeatherObservation
 from src.models.price import MandiPrice
+
+if TYPE_CHECKING:
+    from src.models.farmer import Farmer
 
 logger = logging.getLogger(__name__)
 
@@ -109,12 +112,18 @@ _PRICE_CROPS = {
 
 
 async def compose_daily_brief_marathi(
+    farmer: Farmer | None = None,
     brief_date: date | None = None,
     session: AsyncSession | None = None,
 ) -> list[str]:
     """Return 4-part Marathi brief, querying live DB for weather + prices.
 
     Falls back to a minimal message if DB has no data yet.
+
+    Args:
+        farmer: Farmer object for personalized location (optional for backward compat)
+        brief_date: Date to compose brief for (default: today)
+        session: AsyncSession for DB queries
     """
     if brief_date is None:
         brief_date = date.today()
@@ -130,7 +139,7 @@ async def compose_daily_brief_marathi(
         weather_rows = await _fetch_weather(session, brief_date)
         price_rows = await _fetch_prices(session, brief_date)
 
-    part1 = _build_weather_part(brief_date, day_name, date_str, weather_rows)
+    part1 = _build_weather_part(farmer, brief_date, day_name, date_str, weather_rows)
     part2 = _build_price_part(brief_date, price_rows)
     part3 = _build_pest_part(weather_rows)
     part4 = _build_irrigation_part(weather_rows)
@@ -177,13 +186,24 @@ async def _fetch_prices(session: AsyncSession, brief_date: date) -> list[MandiPr
 # ── Part builders ─────────────────────────────────────────────────────────────
 
 def _build_weather_part(
-    brief_date: date, day_name: str, date_str: str,
+    farmer: Farmer | None,
+    brief_date: date,
+    day_name: str,
+    date_str: str,
     rows: list[WeatherObservation],
 ) -> str:
+    # Personalize location header if farmer provided
+    location_str = "पारनेर तालुका"  # Default fallback
+    if farmer and farmer.taluka:
+        location_str = f"{farmer.taluka} तालुका"
+        # Add village if available
+        if farmer.village_id and hasattr(farmer, 'village') and farmer.village:
+            location_str = f"{farmer.village.village_name}, {location_str}"
+
     header = (
-        f"🌾 *शेतकरी दैनंदिन माहिती — गोरेगाव व वडेगाव, पारनेर तालुका*\n"
+        f"🌾 *शेतकरी दैनंदिन माहिती — {location_str}*\n"
         f"आज: {day_name}, {date_str}\n\n"
-        "☀️ *हवामान अंदाज — पुढील ७ दिवस (पारनेर तालुका)*\n"
+        f"☀️ *हवामान अंदाज — पुढील ७ दिवस ({location_str})*\n"
     )
 
     if not rows:

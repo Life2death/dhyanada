@@ -34,6 +34,8 @@ class Intent(str, Enum):
     SCHEME_QUERY = "scheme_query"  # Phase 2 Module 4: eligible government schemes
     MSP_ALERT = "msp_alert"  # Phase 2 Module 4: MSP price alerts
     DAILY_BRIEF = "daily_brief"  # On-demand farmer daily brief (weather+prices+advisory)
+    VILLAGE_CONFIRMATION = "village_confirmation"  # Village confirmation response (Phase 1)
+    VILLAGE_CHANGE = "village_change"  # Farmer wants to change village (Phase 1)
     SUBSCRIBE = "subscribe"
     UNSUBSCRIBE = "unsubscribe"
     ONBOARDING = "onboarding"

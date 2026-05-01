@@ -972,12 +972,14 @@ async def _broadcast_daily_brief_async():
                 business_account_id=settings.whatsapp_app_id,
             ))
 
-            brief_parts = await compose_daily_brief_marathi(date.today(), session)
             sent_count = 0
             error_count = 0
 
             for farmer in farmers:
                 try:
+                    # Compose brief with farmer-specific context
+                    brief_parts = await compose_daily_brief_marathi(farmer, date.today(), session)
+
                     for part in brief_parts:
                         await whatsapp.send_text_message(to=farmer.phone, text=part)
 
