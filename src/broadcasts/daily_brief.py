@@ -30,9 +30,6 @@ _MARATHI_MONTHS = [
 # Target talukas/villages for weather (slug must match weather_observations.apmc)
 _WEATHER_APMCS = ["goregaon_parner", "wadegaon_parner", "parner"]
 
-# Target districts for mandi prices
-_PRICE_DISTRICTS = ["ahilyanagar", "pune", "nashik"]
-
 # Crops to show in brief (Marathi label → DB crop slug)
 _PRICE_CROPS = {
     "कांदा": "onion",
@@ -105,19 +102,14 @@ async def _fetch_prices(session: AsyncSession, brief_date: date) -> list[MandiPr
         check_date = brief_date - timedelta(days=days_back)
         result = await session.execute(
             select(MandiPrice)
-            .where(
-                and_(
-                    MandiPrice.date == check_date,
-                    MandiPrice.district.in_(_PRICE_DISTRICTS),
-                )
-            )
+            .where(MandiPrice.date == check_date)
             .order_by(MandiPrice.crop, MandiPrice.modal_price.desc())
         )
         rows = list(result.scalars().all())
         if rows:
             logger.info("daily_brief: using mandi prices from %s (%d rows)", check_date, len(rows))
             return rows
-    logger.warning("daily_brief: no mandi prices found in last 3 days")
+    logger.warning("daily_brief: no mandi prices found in last 14 days")
     return []
 
 
