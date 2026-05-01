@@ -105,6 +105,8 @@
   {"taluka": "jamkhed",           "district": "ahilyanagar",      "division": "nashik",    "lat": 18.7181, "lon": 75.3236},
   {"taluka": "karjat_a",          "district": "ahilyanagar",      "division": "nashik",    "lat": 18.9167, "lon": 75.1167},
   {"taluka": "parner",            "district": "ahilyanagar",      "division": "nashik",    "lat": 19.0022, "lon": 74.4369},
+  {"taluka": "goregaon_parner",   "district": "ahilyanagar",      "division": "nashik",    "lat": 19.0916, "lon": 74.4742},
+  {"taluka": "wadegaon_parner",   "district": "ahilyanagar",      "division": "nashik",    "lat": 18.5561, "lon": 74.0658},
   {"taluka": "patoda",            "district": "ahilyanagar",      "division": "nashik",    "lat": 19.1500, "lon": 74.8000},
 
   {"taluka": "haveli",            "district": "pune",             "division": "pune",      "lat": 18.5204, "lon": 73.8567},

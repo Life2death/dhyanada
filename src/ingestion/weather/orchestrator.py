@@ -169,6 +169,16 @@ async def _upsert_records(session: AsyncSession, records: Sequence[WeatherRecord
     if not records:
         return 0
 
+    # Deduplicate by DB constraint key before bulk insert.
+    # current conditions + daily day-0 can produce identical
+    # (date, apmc, metric, forecast_days_ahead, source) pairs in one batch,
+    # which causes CardinalityViolationError even with ON CONFLICT.
+    seen: dict[tuple, WeatherRecord] = {}
+    for rec in records:
+        key = (rec.trade_date, rec.apmc, rec.metric, rec.forecast_days_ahead, rec.source)
+        seen[key] = rec  # last write wins (daily preferred over current for day 0)
+    records = list(seen.values())
+
     # Convert WeatherRecord dataclasses to ORM objects
     orm_records = []
     for rec in records:
