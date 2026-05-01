@@ -9,7 +9,8 @@
       "Bash(DATABASE_PUBLIC_URL=\"postgresql://postgres:jmjLUFeyaEGkkwRPAKbexQMpivDgzMHk@shinkansen.proxy.rlwy.net:26158/railway\" python -m src.scripts.populate_ahilyanagar_villages)",
       "Bash(railway link *)",
       "Bash(railway variables *)",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(xargs grep *)"
     ]
   }
 }
