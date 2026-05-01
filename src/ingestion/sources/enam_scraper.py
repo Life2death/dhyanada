@@ -230,7 +230,7 @@ def _apmc_to_district(apmc_name: str) -> str:
         "PUNE": "pune", "BARAMATI": "pune", "INDAPUR": "pune",
         "AHILYANAGAR": "ahilyanagar", "SANGAMNER": "ahilyanagar",
         "RAHURI": "ahilyanagar", "KOPARGAON": "ahilyanagar",
-        "AMRAVATI": "amarawati", "ACHALPUR": "amarawati",
+        "AMRAVATI": "amravati", "ACHALPUR": "amravati",
         "AKOLA": "akola", "BULDHANA": "buldana",
         "LATUR": "latur", "SOLAPUR": "sholapur", "SANGLI": "sangli",
         "KOLHAPUR": "kolhapur", "SATARA": "satara",

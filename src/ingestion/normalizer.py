@@ -42,6 +42,52 @@ _DISTRICT_ALIASES: dict[str, str] = {
     "nashik": "nashik",
     "nasik": "nashik",
     "नाशिक": "nashik",
+    # Amravati (Vidarbha — cotton/soyabean belt)
+    "amravati": "amravati",
+    "amarawati": "amravati",
+    "amrawati": "amravati",
+    "अमरावती": "amravati",
+    # Akola (cotton/soyabean)
+    "akola": "akola",
+    "अकोला": "akola",
+    # Nagpur (orange/cotton)
+    "nagpur": "nagpur",
+    "नागपूर": "nagpur",
+    # Latur (tur/soyabean, Marathwada)
+    "latur": "latur",
+    "लातूर": "latur",
+    # Sangli (grapes/turmeric)
+    "sangli": "sangli",
+    "सांगली": "sangli",
+    # Solapur (pomegranate/onion)
+    "solapur": "solapur",
+    "sholapur": "solapur",
+    "सोलापूर": "solapur",
+    # Kolhapur
+    "kolhapur": "kolhapur",
+    "कोल्हापूर": "kolhapur",
+    # Satara
+    "satara": "satara",
+    "सातारा": "satara",
+    # Jalgaon (banana/cotton)
+    "jalgaon": "jalgaon",
+    "जळगाव": "jalgaon",
+    # Aurangabad / Chhatrapati Sambhajinagar
+    "aurangabad": "aurangabad",
+    "chhatrapati sambhajinagar": "aurangabad",
+    "छत्रपती संभाजीनगर": "aurangabad",
+    # Wardha (cotton)
+    "wardha": "wardha",
+    "वर्धा": "wardha",
+    # Yavatmal (cotton)
+    "yavatmal": "yavatmal",
+    "यवतमाळ": "yavatmal",
+    # Nanded (Marathwada)
+    "nanded": "nanded",
+    "नांदेड": "nanded",
+    # Osmanabad / Dharashiv
+    "osmanabad": "osmanabad",
+    "dharashiv": "osmanabad",
 }
 
 # ---------- APMCs ----------
@@ -120,12 +166,6 @@ _COMMODITY_ALIASES: dict[str, str] = {
     "soybean": "soyabean",
     "soyabin": "soyabean",
     "सोयाबीन": "soyabean",
-    # Cotton
-    "cotton": "cotton",
-    "kapas": "cotton",
-    "कापूस": "cotton",
-    "cotton(unginned)": "cotton",
-    "cotton(medium staple)": "cotton",
     # Tomato
     "tomato": "tomato",
     "टोमॅटो": "tomato",
@@ -150,6 +190,7 @@ _COMMODITY_ALIASES: dict[str, str] = {
     "ज्वारी": "jowar",
     "bajra": "bajra",
     "pearl millet": "bajra",
+    "bajra(pearl millet/cumbu)": "bajra",
     "बाजरी": "bajra",
     "maize": "maize",
     "corn": "maize",
@@ -168,6 +209,23 @@ _COMMODITY_ALIASES: dict[str, str] = {
     "lahsun": "garlic",
     "lasun": "garlic",
     "लसूण": "garlic",
+    # Cotton (Vidarbha belt — Akola, Amravati, Yavatmal)
+    "cotton": "cotton",
+    "cotton(unginned)": "cotton",
+    "cotton(medium staple)": "cotton",
+    "kapas": "cotton",
+    "कापूस": "cotton",
+    # Groundnut (oilseed, important in Nashik/Pune belt)
+    "groundnut": "groundnut",
+    "groundnut pods(raw)": "groundnut",
+    "moongphali": "groundnut",
+    "shengdana": "groundnut",
+    "शेंगदाणा": "groundnut",
+    # Turmeric (Sangli — India's largest turmeric market)
+    "turmeric": "turmeric",
+    "turmeric(raw)": "turmeric",
+    "haldi": "turmeric",
+    "हळद": "turmeric",
     # Green chilli
     "green chilli": "green_chilli",
     "green chilly": "green_chilli",

@@ -68,8 +68,8 @@ _DISTRICT_MARATHI: dict[str, str] = {
     "pune": "पुणे",
     "ahilyanagar": "अहिल्यानगर",
     "nashik": "नाशिक",
-    "amarawati": "अमरावती",
-    "sholapur": "सोलापूर",
+    "amravati": "अमरावती",
+    "solapur": "सोलापूर",
     "navi_mumbai": "नवी मुंबई",
     "mumbai": "मुंबई",
     "latur": "लातूर",
@@ -84,6 +84,7 @@ _DISTRICT_MARATHI: dict[str, str] = {
     "nagpur": "नागपूर",
     "buldana": "बुलढाणा",
     "akola": "अकोला",
+    "yavatmal": "यवतमाळ",
 }
 
 # Crops to show in brief (Marathi label → DB crop slug)
@@ -95,11 +96,15 @@ _PRICE_CROPS = {
     "तूर": "tur",
     "हरभरा": "gram",
     "ज्वारी": "jowar",
+    "बाजरी": "bajra",
     "गहू": "wheat",
     "मका": "maize",
+    "कापूस": "cotton",
     "डाळिंब": "pomegranate",
     "द्राक्षे": "grapes",
     "लसूण": "garlic",
+    "हळद": "turmeric",
+    "शेंगदाणा": "groundnut",
 }
 
 

@@ -52,19 +52,31 @@ _ALL_VARIETIES = "[100007]"
 _DATA_TYPE_PRICE = "100004"
 
 # Target commodities: canonical_slug → (group_id, commodity_id)
+# IDs confirmed from https://api.agmarknet.gov.in/v1/daily-price-arrival/filters
 _COMMODITIES: dict[str, tuple[str, str]] = {
+    # Vegetables
     "onion":       ("6", "23"),
     "tomato":      ("6", "65"),
     "potato":      ("6", "24"),
     "garlic":      ("6", "25"),
+    # Fruits
     "pomegranate": ("5", "160"),
     "grapes":      ("5", "22"),
+    # Oilseeds
     "soyabean":    ("3", "13"),
+    "groundnut":   ("3", "10"),
+    # Pulses
     "tur":         ("2", "45"),
     "gram":        ("2", "6"),
+    # Cereals
     "wheat":       ("1", "1"),
     "maize":       ("1", "4"),
     "jowar":       ("1", "5"),
+    "bajra":       ("1", "28"),
+    # Fiber
+    "cotton":      ("4", "15"),
+    # Spices
+    "turmeric":    ("7", "35"),
 }
 
 _HEADERS = {
