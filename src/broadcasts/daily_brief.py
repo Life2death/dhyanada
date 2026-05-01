@@ -27,8 +27,64 @@ _MARATHI_MONTHS = [
     "जुलै", "ऑगस्ट", "सप्टेंबर", "ऑक्टोबर", "नोव्हेंबर", "डिसेंबर",
 ]
 
+_SIGNATURE = "— अन्नदाता 🌾"
+
 # Target talukas/villages for weather (slug must match weather_observations.apmc)
 _WEATHER_APMCS = ["goregaon_parner", "wadegaon_parner", "parner"]
+
+# Known APMC display names → Marathi short name
+_MANDI_MARATHI: dict[str, str] = {
+    "Pune(Pimpri) APMC": "पिंपरी APMC",
+    "Pune APMC": "पुणे APMC",
+    "Pune(Market Yard) APMC": "मार्केट यार्ड APMC",
+    "Pune(Moshi) APMC": "मोशी APMC",
+    "Varud(Rajura Bazar) APMC": "वरूड APMC",
+    "Sangola APMC": "सांगोला APMC",
+    "Lasalgaon APMC": "लासलगाव APMC",
+    "Nashik APMC": "नाशिक APMC",
+    "Ahmednagar APMC": "अहमदनगर APMC",
+    "Sangamner APMC": "संगमनेर APMC",
+    "Rahuri APMC": "राहुरी APMC",
+    "Pimpalgaon APMC": "पिंपळगाव APMC",
+    "Manmad APMC": "मनमाड APMC",
+    "Yeola APMC": "येवला APMC",
+    "Kopargaon APMC": "कोपरगाव APMC",
+    "Baramati APMC": "बारामती APMC",
+    "Indapur APMC": "इंदापूर APMC",
+    "Vashi APMC": "वाशी APMC",
+}
+
+
+def _mandi_mr(mandi_name: str) -> str:
+    """Return Marathi name for a mandi; strips English suffix if unknown."""
+    if mandi_name in _MANDI_MARATHI:
+        return _MANDI_MARATHI[mandi_name]
+    # Strip trailing " APMC" so at least English location shows cleanly
+    return mandi_name.replace(" APMC", "").strip()
+
+
+# District slug → Marathi display name
+_DISTRICT_MARATHI: dict[str, str] = {
+    "pune": "पुणे",
+    "ahilyanagar": "अहिल्यानगर",
+    "nashik": "नाशिक",
+    "amarawati": "अमरावती",
+    "sholapur": "सोलापूर",
+    "navi_mumbai": "नवी मुंबई",
+    "mumbai": "मुंबई",
+    "latur": "लातूर",
+    "jalgaon": "जळगाव",
+    "kolhapur": "कोल्हापूर",
+    "sangli": "सांगली",
+    "satara": "सातारा",
+    "aurangabad": "औरंगाबाद",
+    "osmanabad": "उस्मानाबाद",
+    "nanded": "नांदेड",
+    "wardha": "वर्धा",
+    "nagpur": "नागपूर",
+    "buldana": "बुलढाणा",
+    "akola": "अकोला",
+}
 
 # Crops to show in brief (Marathi label → DB crop slug)
 _PRICE_CROPS = {
@@ -126,7 +182,7 @@ def _build_weather_part(
     )
 
     if not rows:
-        return header + "⚠️ हवामान डेटा उपलब्ध नाही. कृपया नंतर तपासा.\n\n— किसान AI 🌾"
+        return header + f"⚠️ हवामान डेटा उपलब्ध नाही. कृपया नंतर तपासा.\n\n{_SIGNATURE}"
 
     # Build daily summary from weather_observations
     # Group by date → {date: {metric: value}}
@@ -164,17 +220,16 @@ def _build_weather_part(
         cond = conditions.get(d, "")
         table += f"{mr_day} | {date_label} | {t_max} | {t_min} | {rain} | {cond}\n"
 
-    return header + table + "\n— किसान AI 🌾"
+    return header + table + f"\n{_SIGNATURE}"
 
 
 def _build_price_part(brief_date: date, rows: list[MandiPrice]) -> str:
-    header = "💰 *आजचे APMC मंडी भाव — अहिल्यानगर/पुणे मंडी* (₹/क्विंटल)\n"
+    header = "💰 *आजचे APMC मंडी भाव — महाराष्ट्र* (₹/क्विंटल)\n"
 
     if not rows:
-        return header + "⚠️ आजचे मंडी भाव उपलब्ध नाहीत. संध्याकाळी ८ नंतर पुन्हा तपासा.\n\n— किसान AI 🌾"
+        return header + "⚠️ आजचे मंडी भाव उपलब्ध नाहीत. संध्याकाळी ८ नंतर पुन्हा तपासा.\n\n— अन्नदाता 🌾"
 
-    # Build price table from live DB rows
-    # Group best price per crop (highest modal)
+    # Best price per crop (highest modal across all markets)
     best: dict[str, MandiPrice] = {}
     for row in rows:
         crop = row.crop
@@ -185,18 +240,37 @@ def _build_price_part(brief_date: date, rows: list[MandiPrice]) -> str:
     for marathi_label, slug in _PRICE_CROPS.items():
         if slug in best:
             p = best[slug]
-            low = f"₹{int(p.min_price)}" if p.min_price else "—"
-            modal = f"₹{int(p.modal_price)}" if p.modal_price else "—"
-            high = f"₹{int(p.max_price)}" if p.max_price else "—"
+            low   = f"₹{int(p.min_price)}"   if p.min_price   else "—"
+            modal = f"₹{int(p.modal_price)}"  if p.modal_price else "—"
+            high  = f"₹{int(p.max_price)}"    if p.max_price   else "—"
             alert = " ⚠️" if slug == "onion" and p.modal_price and p.modal_price < 1000 else ""
             lines.append(f"{marathi_label:10s}: {low} | {modal} | {high}{alert}")
 
     if len(lines) == 1:
         lines.append("(आजचे भाव नोंदणी झाली नाही — उद्या पुन्हा पाहा)")
 
+    # Group crops by their source district + mandi for attribution
+    # district_slug → (Marathi district name, mandi display name, [Marathi crop labels])
+    source_map: dict[str, tuple[str, str, list[str]]] = {}
+    for marathi_label, slug in _PRICE_CROPS.items():
+        if slug not in best:
+            continue
+        p = best[slug]
+        dist_slug = p.district or "unknown"
+        if dist_slug not in source_map:
+            dist_mr = _DISTRICT_MARATHI.get(dist_slug, dist_slug)
+            source_map[dist_slug] = (dist_mr, p.mandi, [])
+        source_map[dist_slug][2].append(marathi_label)
+
+    if source_map:
+        lines.append("\n📍 *भाव कोठून आले:*")
+        for dist_slug, (dist_mr, mandi_name, crop_labels) in source_map.items():
+            crops_str = ", ".join(crop_labels)
+            lines.append(f"  {crops_str} — {dist_mr} ({_mandi_mr(mandi_name)})")
+
     price_date = rows[0].date if rows else brief_date
     lines.append(f"\nस्रोत: Agmarknet | तारीख: {price_date.day} {_MARATHI_MONTHS[price_date.month - 1]}")
-    lines.append("\n— किसान AI 🌾")
+    lines.append(f"\n{_SIGNATURE}")
     return "\n".join(lines)
 
 
@@ -238,7 +312,7 @@ def _build_pest_part(rows: list[WeatherObservation]) -> str:
     if not advisories:
         advisories.append("✅ आज कोणताही विशेष कीड/रोग इशारा नाही. नेहमीप्रमाणे देखरेख ठेवा.")
 
-    return header + "\n\n".join(advisories) + "\n\n— किसान AI 🌾"
+    return header + "\n\n".join(advisories) + "\n\n— अन्नदाता 🌾"
 
 
 def _build_irrigation_part(rows: list[WeatherObservation]) -> str:
@@ -275,7 +349,7 @@ def _build_irrigation_part(rows: list[WeatherObservation]) -> str:
         "२. ☀️ दुपार: जनावरांना सावली + दुप्पट पाणी द्या\n"
         "३. 🌇 संध्याकाळी: तणावग्रस्त पिकांना हलके सिंचन\n"
         "४. 📱 *माहिती* टाइप करा — उद्याचा ताजा अहवाल मिळवा\n\n"
-        "— किसान AI 🌾"
+        "— अन्नदाता 🌾"
     )
 
     return header + irrigation + checklist
