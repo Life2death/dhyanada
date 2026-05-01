@@ -62,6 +62,14 @@ class MsambScraperSource(PriceSource):
         records: list[PriceRecord] = []
         headers = {"User-Agent": _UA, "Accept-Language": "en-IN,en;q=0.9,mr;q=0.8"}
         try:
+            async with httpx.AsyncClient(timeout=self._timeout, headers=headers, follow_redirects=False) as client:
+                # Fast health check — ApmcDetail controller redirects to /Home/Error when down.
+                probe = await client.get(_REPORT_URL)
+                if probe.status_code in (301, 302, 303, 307, 308):
+                    location = probe.headers.get("location", "")
+                    logger.warning("msamb: site redirected to %s — skipping (server down)", location)
+                    return []
+
             async with httpx.AsyncClient(timeout=self._timeout, headers=headers, follow_redirects=True) as client:
                 # One report pull per target district keeps payloads parseable.
                 for district_display in ("Pune", "Ahmednagar", "Thane", "Mumbai", "Nashik"):
