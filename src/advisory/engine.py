@@ -208,15 +208,30 @@ async def _advisory_exists(
     return result.scalar_one_or_none() is not None
 
 
-def _build_advisory(
+async def _build_advisory(
     rule: AdvisoryRule,
     farmer_id: int,
     wx: WeatherAggregate,
     farmer_crops: list[str],
+    district: str,
 ) -> Advisory:
     today = date.today()
     # Pick crop from farmer's list when rule is crop-agnostic
     crop = rule.crop or (farmer_crops[0] if farmer_crops else None)
+
+    # Enrich with AI insights (optional; fails gracefully)
+    from src.advisory.ai_enrichment import enrich_advisory_with_ai
+    ai_insights = await enrich_advisory_with_ai(
+        rule_type=rule.advisory_type,
+        farmer_crops=farmer_crops,
+        max_temp_c=wx.max_temp_c,
+        min_temp_c=wx.min_temp_c,
+        avg_humidity_pct=wx.avg_humidity_pct,
+        total_rainfall_mm=wx.total_rainfall_mm,
+        consecutive_high_humidity_days=wx.consecutive_high_humidity_days,
+        district=district,
+    )
+
     return Advisory(
         farmer_id=farmer_id,
         rule_id=rule.id,
@@ -228,6 +243,7 @@ def _build_advisory(
         message=rule.message_en,
         action_hint=rule.action_hint,
         source_citation=rule.source_citation,
+        ai_insights=ai_insights,
         delivered_via={"dashboard": True},
     )
 
@@ -257,7 +273,7 @@ async def generate_for_farmer(db: AsyncSession, farmer_id: int) -> list[Advisory
             continue
         if await _advisory_exists(db, farmer_id, rule.id, today):
             continue
-        adv = _build_advisory(rule, farmer_id, wx, crops)
+        adv = await _build_advisory(rule, farmer_id, wx, crops, district)
         db.add(adv)
         created.append(adv)
 

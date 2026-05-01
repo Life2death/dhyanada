@@ -435,7 +435,7 @@ async def receive_message(request: Request):
                         from src.broadcasts.daily_brief import compose_daily_brief_marathi
                         from datetime import date as _date
 
-                        brief_parts = await compose_daily_brief_marathi(_date.today(), session)
+                        brief_parts = await compose_daily_brief_marathi(farmer, _date.today(), session)
                         for part in brief_parts:
                             await whatsapp.send_text_message(msg.from_phone, part)
                         logger.info(f"✅ Sent daily brief ({len(brief_parts)} parts) to {msg.from_phone}")
@@ -494,10 +494,75 @@ async def receive_message(request: Request):
                     elif intent_type == Intent.GREETING:
                         from src.broadcasts.daily_brief import compose_daily_brief_marathi
                         from datetime import date as _date
-                        brief_parts = await compose_daily_brief_marathi(_date.today(), session)
+                        brief_parts = await compose_daily_brief_marathi(farmer, _date.today(), session)
                         for part in brief_parts:
                             await whatsapp.send_text_message(msg.from_phone, part)
                         logger.info(f"✅ Sent 4-part daily brief on greeting to {msg.from_phone}")
+
+                    # Village confirmation (Phase 1)
+                    elif intent_type == Intent.VILLAGE_CONFIRMATION:
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Village confirmation requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            from src.handlers.village_confirmation import handle_village_confirmation
+                            is_locked, reply = await handle_village_confirmation(farmer, msg.text or "", session)
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"✅ Processed village confirmation from {msg.from_phone}: locked={is_locked}")
+
+                    # Village change request (Phase 1)
+                    elif intent_type == Intent.VILLAGE_CHANGE:
+                        if not farmer:
+                            reply = "❌ कृपया आधी नोंदणी पूर्ण करा.\n(Please complete onboarding first.)"
+                            await whatsapp.send_text_message(msg.from_phone, reply)
+                            logger.info(f"Village change requested but farmer not onboarded: {msg.from_phone}")
+                        else:
+                            from src.onboarding.ai_parser import parse_location
+                            from src.models.village import Village
+
+                            # Parse new location from farmer's message
+                            location = await parse_location(msg.text or "")
+                            new_village = location.get("village")
+                            new_taluka = location.get("taluka")
+                            new_district = location.get("district")
+
+                            if not new_village:
+                                reply = (
+                                    "गाव सापडले नाही. कृपया असे पाठवा:\n"
+                                    "*गाव, तालुका, जिल्हा* — उदा: *वडेगाव, पारनेर, अहिल्यानगर*\n\n"
+                                    "Village not found. Please send:\n"
+                                    "*village, taluka, district* — e.g: *Vadegaon, Parner, Ahmednagar*"
+                                )
+                            else:
+                                # Try to look up village in database
+                                from sqlalchemy import select as sql_select
+                                result = await session.execute(
+                                    sql_select(Village).where(
+                                        Village.village_name.ilike(new_village)
+                                    ).limit(1)
+                                )
+                                village_record = result.scalar_one_or_none()
+
+                                # Update farmer
+                                farmer.village_id = village_record.id if village_record else None
+                                farmer.taluka = new_taluka
+                                from src.ingestion.normalizer import normalize_district
+                                farmer.district = normalize_district(new_district) or new_district
+                                farmer.village_confirmation_count = 0  # Reset confirmations
+                                farmer.village_locked = False
+
+                                await session.commit()
+
+                                village_display = f"{new_village}, {new_taluka}" if new_taluka else new_village
+                                reply = (
+                                    f"✅ आपल्या गावाचे नाव बदल झाल:े *{village_display}*\n"
+                                    f"आता या गावासाठी माहिती मिळेल.\n\n"
+                                    f"Your village updated to: {village_display}"
+                                )
+                                logger.info(f"✅ Updated village for {msg.from_phone} to {village_display}")
+
+                            await whatsapp.send_text_message(msg.from_phone, reply)
 
                     elif intent_type == Intent.FEEDBACK:
                         # Log feedback to database if farmer exists

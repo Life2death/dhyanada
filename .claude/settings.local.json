@@ -10,7 +10,8 @@
       "Bash(railway link *)",
       "Bash(railway variables *)",
       "Bash(grep -v \"^$\")",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost/kisan_ai\" alembic current)"
     ]
   }
 }

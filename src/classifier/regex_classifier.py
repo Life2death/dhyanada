@@ -118,6 +118,20 @@ _FEEDBACK_RE = _p(
     r"अभिप्राय", r"सूचना\s*द्या", r"तक्रार", r"धन्यवाद",
 )
 
+# Village confirmation triggers (Phase 1)
+_VILLAGE_CONFIRMATION_RE = _p(
+    r"^\s*yes\s*[!.]*\s*$", r"^\s*yeah\s*[!.]*\s*$",
+    r"^\s*हो\s*[!.]*\s*$", r"^\s*होय\s*[!.]*\s*$", r"^\s*हा\s*[!.]*\s*$",
+    r"^\s*ha\s*[!.]*\s*$", r"^\s*haa\s*[!.]*\s*$",
+)
+
+# Village change triggers (Phase 1)
+_VILLAGE_CHANGE_RE = _p(
+    r"^\s*no\s*[!.]*\s*$", r"^\s*nope\s*[!.]*\s*$",
+    r"^\s*नाही\s*[!.]*\s*$", r"गाव\s*बदला", r"\bchange\s+village\b",
+    r"^\s*nahi\s*[!.]*\s*$", r"\bother\s+village\b",
+)
+
 # ── Weather query triggers (Phase 2) ──────────────────────────────────────
 _WEATHER_RE = _p(
     # English
@@ -275,6 +289,26 @@ def classify_regex(text: str) -> IntentResult:
             source="regex",
             raw_text=text,
             explanation="subscribe_pattern",
+        )
+
+    # Village confirmation (Phase 1) — affirmative response to village prompt
+    if _VILLAGE_CONFIRMATION_RE.search(t):
+        return IntentResult(
+            intent=Intent.VILLAGE_CONFIRMATION,
+            confidence=1.0,
+            source="regex",
+            raw_text=text,
+            explanation="village_confirmation_pattern",
+        )
+
+    # Village change (Phase 1) — negative response or explicit village change
+    if _VILLAGE_CHANGE_RE.search(t):
+        return IntentResult(
+            intent=Intent.VILLAGE_CHANGE,
+            confidence=1.0,
+            source="regex",
+            raw_text=text,
+            explanation="village_change_pattern",
         )
 
     # MSP alert (minimum support price alert) — check before PRICE_ALERT

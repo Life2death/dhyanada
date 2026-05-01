@@ -177,6 +177,7 @@ async def list_recent_advisories(
             "message": a.message,
             "action_hint": a.action_hint,
             "delivered_via": a.delivered_via,
+            "ai_insights": a.ai_insights,
             "dismissed_at": a.dismissed_at.isoformat() if a.dismissed_at else None,
             "created_at": a.created_at.isoformat() if a.created_at else None,
         }

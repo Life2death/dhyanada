@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.weather import WeatherObservation
 from src.models.price import MandiPrice
+from src.models.advisory import Advisory
 
 if TYPE_CHECKING:
     from src.models.farmer import Farmer
@@ -141,7 +142,7 @@ async def compose_daily_brief_marathi(
 
     part1 = _build_weather_part(farmer, brief_date, day_name, date_str, weather_rows)
     part2 = _build_price_part(brief_date, price_rows)
-    part3 = _build_pest_part(weather_rows)
+    part3 = await _build_pest_part(farmer, brief_date, session, weather_rows)
     part4 = _build_irrigation_part(weather_rows)
 
     return [part1, part2, part3, part4]
@@ -298,45 +299,75 @@ def _build_price_part(brief_date: date, rows: list[MandiPrice]) -> str:
     return "\n".join(lines)
 
 
-def _build_pest_part(rows: list[WeatherObservation]) -> str:
-    """Weather-based pest advisory."""
-    header = "🦠 *रोग व कीड सतर्कता — हवामानावर आधारित*\n\n"
+async def _build_pest_part(
+    farmer: Optional[Farmer],
+    brief_date: date,
+    session: Optional[AsyncSession],
+    rows: list[WeatherObservation],
+) -> str:
+    """Pest advisory with AI-enriched guidance from today's generated advisories."""
+    header = "🦠 *रोग व कीड सतर्कता — AI विश्लेषण*\n\n"
 
-    # Extract today's humidity and temp to give relevant advisory
-    humidity = None
-    temp_max = None
-    for row in rows:
-        if row.forecast_days_ahead == 0:
-            if row.metric == "humidity" and humidity is None:
-                humidity = float(row.value)
-            if row.metric == "temperature" and row.max_value and temp_max is None:
-                temp_max = float(row.max_value)
-
-    advisories = []
-
-    # High humidity → fungal disease risk
-    if humidity and humidity > 70:
-        advisories.append(
-            "🚨 *कांदा — फुलकिडे व करपा* (जास्त आर्द्रता)\n"
-            "लक्षण: पानांवर रुपेरी रेषा, पान कुरवाळणे.\n"
-            "उपाय: फिप्रोनिल ५% SC @ २ मिली/लिटर फवारा."
+    # Query farmer's advisories for today if session available
+    advisories_text = []
+    if farmer and session and farmer.id:
+        result = await session.execute(
+            select(Advisory).where(
+                and_(
+                    Advisory.farmer_id == farmer.id,
+                    Advisory.advisory_date == brief_date,
+                )
+            )
         )
-        advisories.append(
-            "🚨 *डाळिंब — जिवाणू करपा (तेल्या)*\n"
-            "उपाय: बोर्डो मिश्रण १% + स्ट्रेप्टोसायक्लीन ०.५ ग्रॅ/लिटर."
-        )
+        advisories = result.scalars().all()
 
-    # High temp → thrips and heat stress
-    if temp_max and temp_max > 35:
-        advisories.append(
-            f"🚨 *उष्णता ताण ({int(temp_max)}°C)* — टोमॅटो/वांगे\n"
-            "थंड वेळात हलके पाणी द्या. दुपारी ११–४ शेतात काम टाळा."
-        )
+        for adv in advisories:
+            section = f"*⚠️ {adv.title}*\n{adv.message}\n"
 
-    if not advisories:
-        advisories.append("✅ आज कोणताही विशेष कीड/रोग इशारा नाही. नेहमीप्रमाणे देखरेख ठेवा.")
+            # Append AI insights if available
+            if adv.ai_insights:
+                ai = adv.ai_insights
+                if ai.get("crop_guidance_mr"):
+                    section += f"\n🤖 *AI सुझाव*:\n{ai['crop_guidance_mr']}\n"
+                if ai.get("treatment_mr"):
+                    section += f"उपाय: {ai['treatment_mr']}\n"
 
-    return header + "\n\n".join(advisories) + "\n\n— अन्नदाता 🌾"
+            advisories_text.append(section)
+
+    # Fallback to simple weather-based advisories if no DB advisories
+    if not advisories_text:
+        humidity = None
+        temp_max = None
+        for row in rows:
+            if row.forecast_days_ahead == 0:
+                if row.metric == "humidity" and humidity is None:
+                    humidity = float(row.value)
+                if row.metric == "temperature" and row.max_value and temp_max is None:
+                    temp_max = float(row.max_value)
+
+        # High humidity → fungal disease risk
+        if humidity and humidity > 70:
+            advisories_text.append(
+                "🚨 *कांदा — फुलकिडे व करपा* (जास्त आर्द्रता)\n"
+                "लक्षण: पानांवर रुपेरी रेषा, पान कुरवाळणे.\n"
+                "उपाय: फिप्रोनिल ५% SC @ २ मिली/लिटर फवारा."
+            )
+            advisories_text.append(
+                "🚨 *डाळिंब — जिवाणू करपा (तेल्या)*\n"
+                "उपाय: बोर्डो मिश्रण १% + स्ट्रेप्टोसायक्लीन ०.५ ग्रॅ/लिटर."
+            )
+
+        # High temp → thrips and heat stress
+        if temp_max and temp_max > 35:
+            advisories_text.append(
+                f"🚨 *उष्णता ताण ({int(temp_max)}°C)* — टोमॅटो/वांगे\n"
+                "थंड वेळात हलके पाणी द्या. दुपारी ११–४ शेतात काम टाळा."
+            )
+
+        if not advisories_text:
+            advisories_text.append("✅ आज कोणताही विशेष कीड/रोग इशारा नाही. नेहमीप्रमाणे देखरेख ठेवा.")
+
+    return header + "\n\n".join(advisories_text) + "\n\n— अन्नदाता 🌾"
 
 
 def _build_irrigation_part(rows: list[WeatherObservation]) -> str:

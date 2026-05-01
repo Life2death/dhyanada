@@ -19,7 +19,7 @@ depends_on = None
 def upgrade() -> None:
     # Add village confirmation fields
     op.add_column('farmers', sa.Column('village_confirmation_count', sa.Integer(), nullable=False, server_default='0'))
-    op.add_column('farmers', sa.Column('village_locked', sa.Integer(), nullable=False, server_default='0'))
+    op.add_column('farmers', sa.Column('village_locked', sa.Boolean(), nullable=False, server_default='false'))
     op.add_column('farmers', sa.Column('village_confirmed_at', sa.DateTime(timezone=True), nullable=True))
 
     # Drop the server defaults after adding columns (so they're just for initial population)
