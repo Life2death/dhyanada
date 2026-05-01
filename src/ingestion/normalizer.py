@@ -163,10 +163,26 @@ _COMMODITY_ALIASES: dict[str, str] = {
     # Pomegranate (Ahilyanagar/Nashik belt)
     "pomegranate": "pomegranate",
     "डाळिंब": "pomegranate",
+    # Garlic (important in Pune/Nashik belt)
+    "garlic": "garlic",
+    "lahsun": "garlic",
+    "lasun": "garlic",
+    "लसूण": "garlic",
     # Green chilli
     "green chilli": "green_chilli",
+    "green chilly": "green_chilli",
     "chilli": "chilli",
+    "chilly": "chilli",
     "मिरची": "chilli",
+    # Bengal gram variants
+    "bengal gram(gram)(whole)": "chana",
+    "gram(whole)": "chana",
+    # Additional produce
+    "bhindi(ladies finger)": "bhindi",
+    "ladies finger": "bhindi",
+    "bottle gourd": "bottle_gourd",
+    "guar": "guar",
+    "spinach": "spinach",
 }
 
 # ---------- Helpers ----------

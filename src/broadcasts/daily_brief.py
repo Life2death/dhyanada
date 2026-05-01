@@ -100,8 +100,8 @@ async def _fetch_weather(session: AsyncSession, brief_date: date) -> list[Weathe
 
 
 async def _fetch_prices(session: AsyncSession, brief_date: date) -> list[MandiPrice]:
-    """Fetch latest mandi prices — today's if available, else last 3 days."""
-    for days_back in range(3):
+    """Fetch latest mandi prices — most recent available within last 14 days."""
+    for days_back in range(14):
         check_date = brief_date - timedelta(days=days_back)
         result = await session.execute(
             select(MandiPrice)
