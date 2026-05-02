@@ -11,7 +11,9 @@
       "Bash(railway variables *)",
       "Bash(grep -v \"^$\")",
       "Bash(xargs grep *)",
-      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost/kisan_ai\" alembic current)"
+      "Bash(DATABASE_URL=\"postgresql://postgres:postgres@localhost/kisan_ai\" alembic current)",
+      "Bash(cat)",
+      "Read(//c/Learning/kisan-ai/**)"
     ]
   }
 }

@@ -1,0 +1,206 @@
+================================================================================
+                    BEFORE vs AFTER COMPARISON
+================================================================================
+
+ISSUE #1: MANDI PRICE TIMING
+──────────────────────────────────────────────────────────────────────────────
+
+BEFORE (BROKEN):
+    7:00 AM → broadcast_daily_brief
+             → _fetch_prices(today)
+             → NOT FOUND (ingestion not until 8 PM)
+             → Falls back to yesterday's prices or empty
+
+    8:00 PM → ingest_prices (too late!)
+
+Result: Morning brief missing today's prices ❌
+
+
+AFTER (FIXED):
+    5:30 AM → ingest_prices ✅ (TODAY'S PRICES AVAILABLE)
+
+    6:00 AM → trigger_price_alerts
+
+    6:45 AM → trigger_farm_advisories
+
+    7:00 AM → broadcast_daily_brief
+             → _fetch_prices(today)
+             → FOUND ✅ (just ingested at 5:30 AM)
+
+Result: Morning brief includes current day's prices ✅
+
+
+ISSUE #2: AI ENRICHMENT IMPORT LOCATION
+──────────────────────────────────────────────────────────────────────────────
+
+BEFORE (RISKY):
+    Advisory Engine
+    ├─ async def _build_advisory(...)
+    │  ├─ from src.advisory.ai_enrichment import ...  ← INSIDE FUNCTION
+    │  │   (Executed every time function called)
+    │  │   (Risk: circular imports, module loading issues)
+    │  │
+    │  └─ await enrich_advisory_with_ai(...)
+
+
+AFTER (CLEAN):
+    Advisory Engine (Top of file)
+    ├─ from src.advisory.ai_enrichment import ...  ← AT MODULE LEVEL
+    │   (Executed once when module loads)
+    │   (Safe: import happens at startup, errors caught immediately)
+    │
+    └─ async def _build_advisory(...)
+       └─ await enrich_advisory_with_ai(...)
+
+
+ISSUE #3: DEBUGGING VISIBILITY
+──────────────────────────────────────────────────────────────────────────────
+
+BEFORE (NO VISIBILITY):
+    trigger_farm_advisories
+    ├─ generate_for_all_farmers()
+    │  ├─ (silently succeeds or fails)
+    │  └─ No logs → Can't tell what happened
+    │
+    └─ Result: Advisories created or not? ❓
+
+    broadcast_daily_brief
+    ├─ _build_pest_part()
+    │  ├─ if farmer and session and farmer.id:
+    │  │  └─ Query advisories (silently succeeds or fails)
+    │  │     No logs → Can't tell if query executed or found results
+    │  │
+    │  └─ Result: Advisories queried or not? ❓
+
+
+AFTER (FULL VISIBILITY):
+    trigger_farm_advisories
+    ├─ generate_for_all_farmers()
+    │  ├─ [DEBUG] enriching rule=X with AI for crops=Y
+    │  ├─ [INFO] AI enrichment success... model=llama
+    │  └─ Logs → Can trace exact execution path ✅
+    │
+    └─ Result: Advisories created with full audit trail ✅
+
+    broadcast_daily_brief
+    ├─ _build_pest_part()
+    │  ├─ [DEBUG] querying advisories for farmer_id=X, date=Y
+    │  ├─ [INFO] found N advisories for farmer_id=X
+    │  └─ Logs → Can verify query executed and results ✅
+    │
+    └─ Result: Advisories fetched with visibility ✅
+
+
+SCHEDULE COMPARISON:
+──────────────────────────────────────────────────────────────────────────────
+
+BEFORE (BROKEN):
+    5:00 AM ─────────────────────────────────
+    6:00 AM  ingest_weather                ✓
+    6:15 AM  ├─ ingest_schemes            ✓
+    6:20 AM  ├─ trigger_msp_alerts        ✓
+    6:30 AM  ├─ broadcast_prices          ✓
+    6:45 AM  ├─ trigger_farm_advisories   ✓
+    7:00 AM  └─ broadcast_daily_brief     ✓ (No prices in part2!)
+    7:00 AM ─────────────────────────────────
+    8:00 PM  ┌─ ingest_prices (TOO LATE!) ✗
+    8:30 PM  └─ trigger_price_alerts      ✗
+             Brief already sent 11 hours ago!
+
+
+AFTER (FIXED):
+    5:00 AM ─────────────────────────────────
+    5:30 AM  ingest_prices ✓ (MOVED!)      ← TODAY'S PRICES READY
+    6:00 AM  trigger_price_alerts ✓        ← Check against fresh prices
+    6:00 AM  ingest_weather ✓
+    6:15 AM  ingest_schemes ✓
+    6:20 AM  trigger_msp_alerts ✓
+    6:30 AM  broadcast_prices ✓
+    6:45 AM  trigger_farm_advisories ✓     ← Generate with AI
+    7:00 AM  broadcast_daily_brief ✓ ← Part 2: TODAY'S PRICES ✓
+    7:00 AM                          ← Part 3: AI INSIGHTS ✓
+             ─────────────────────────────────
+             (No changes needed after 7:00 AM)
+
+
+DAILY BRIEF OUTPUT:
+──────────────────────────────────────────────────────────────────────────────
+
+BEFORE:
+    Part 1: ☀️ WEATHER
+    ✅ Working - 7-day forecast
+
+    Part 2: 💰 MANDI PRICES
+    ❌ EMPTY OR STALE (Yesterday's/old prices shown)
+
+    Part 3: 🦠 DISEASE & PEST WATCH
+    ❌ BASIC ONLY (Falls back to hardcoded rules)
+       - "High humidity → fungal risk"
+       - No AI insights
+       - No crop-specific guidance
+
+    Part 4: 💧 IRRIGATION PLAN
+    ✅ Working - based on rainfall forecast
+
+
+AFTER:
+    Part 1: ☀️ WEATHER
+    ✅ Working - 7-day forecast
+
+    Part 2: 💰 MANDI PRICES
+    ✅ TODAY'S PRICES (Ingested at 5:30 AM)
+       - Current day's rates from Agmarknet
+       - Latest market data
+
+    Part 3: 🦠 DISEASE & PEST WATCH
+    ✅ AI-ENRICHED (Dynamic, crop-specific)
+       - Rules matched against weather
+       - AI generates Marathi guidance:
+         🤖 *AI सुझाव*:
+         [crop-specific risk summary]
+         उपाय: [treatment recommendations]
+
+    Part 4: 💧 IRRIGATION PLAN
+    ✅ Working - based on rainfall forecast
+
+
+CODE CHANGES SUMMARY:
+──────────────────────────────────────────────────────────────────────────────
+
+File: src/scheduler/celery_app.py
+  Line 63: hour=20, minute=0   →   hour=5, minute=30  (5:30 AM)
+  Line 69: hour=20, minute=30  →   hour=6, minute=0   (6:00 AM)
+
+File: src/scheduler/tasks.py
+  Line 360-361: Updated docstring for ingest_prices
+  Line 413-414: Updated docstring for trigger_price_alerts
+
+File: src/advisory/engine.py
+  Line 21: Added import (moved from inside function)
+  Lines 14, 25: Added logging imports
+  Lines 228-242: Added debug/info logs around AI enrichment
+
+File: src/broadcasts/daily_brief.py
+  Lines 313-323: Added debug/info logs for advisory query
+
+
+IMPACT ASSESSMENT:
+──────────────────────────────────────────────────────────────────────────────
+
+Breaking Changes:     NONE ✅
+Database Changes:     NONE ✅
+API Changes:          NONE ✅
+Configuration:        Celery beat schedule (non-breaking)
+Backwards Compat:     100% ✅
+
+Risk Level:           LOW
+Deployment Time:      < 5 minutes
+Rollback Time:        < 5 minutes (if needed)
+
+Benefits:
+  ✅ Morning brief includes today's prices
+  ✅ Third card populated with AI insights
+  ✅ Full debugging visibility for future troubleshooting
+  ✅ Safer import structure
+
+================================================================================

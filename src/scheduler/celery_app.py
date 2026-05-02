@@ -58,15 +58,15 @@ app.conf.beat_schedule = {
     },
     "ingest-prices-daily": {
         "task": "src.scheduler.tasks.ingest_prices",
-        # 8:00 PM IST every day (evening price ingestion)
+        # 5:30 AM IST every day (morning price ingestion - before daily brief at 7:00 AM)
         # Phase 2 Module 5
-        "schedule": crontab(hour=20, minute=0),
+        "schedule": crontab(hour=5, minute=30),
     },
     "trigger-price-alerts-daily": {
         "task": "src.scheduler.tasks.trigger_price_alerts",
-        # 8:30 PM IST every day (after price ingestion at 8:00 PM)
+        # 6:00 AM IST every day (after price ingestion at 5:30 AM, before brief at 7:00 AM)
         # Phase 2 Module 5
-        "schedule": crontab(hour=20, minute=30),
+        "schedule": crontab(hour=6, minute=0),
     },
     "hard-delete-erased-farmers": {
         "task": "src.scheduler.tasks.hard_delete_erased_farmers",

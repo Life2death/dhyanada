@@ -311,6 +311,10 @@ async def _build_pest_part(
     # Query farmer's advisories for today if session available
     advisories_text = []
     if farmer and session and farmer.id:
+        logger.debug(
+            "daily_brief: querying advisories for farmer_id=%s, date=%s",
+            farmer.id, brief_date
+        )
         result = await session.execute(
             select(Advisory).where(
                 and_(
@@ -320,6 +324,10 @@ async def _build_pest_part(
             )
         )
         advisories = result.scalars().all()
+        logger.info(
+            "daily_brief: found %d advisories for farmer_id=%s",
+            len(advisories), farmer.id
+        )
 
         for adv in advisories:
             section = f"*⚠️ {adv.title}*\n{adv.message}\n"

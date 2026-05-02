@@ -9,6 +9,7 @@ Usage:
 """
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -18,6 +19,9 @@ from typing import Iterable, List, Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+logger = logging.getLogger(__name__)
+
+from src.advisory.ai_enrichment import enrich_advisory_with_ai
 from src.advisory.models import WeatherAggregate
 from src.models.advisory import Advisory
 from src.models.advisory_rule import AdvisoryRule
@@ -220,7 +224,10 @@ async def _build_advisory(
     crop = rule.crop or (farmer_crops[0] if farmer_crops else None)
 
     # Enrich with AI insights (optional; fails gracefully)
-    from src.advisory.ai_enrichment import enrich_advisory_with_ai
+    logger.debug(
+        "advisory_engine: enriching rule=%s with AI for crops=%s district=%s",
+        rule.rule_key, farmer_crops, district
+    )
     ai_insights = await enrich_advisory_with_ai(
         rule_type=rule.advisory_type,
         farmer_crops=farmer_crops,
@@ -231,6 +238,13 @@ async def _build_advisory(
         consecutive_high_humidity_days=wx.consecutive_high_humidity_days,
         district=district,
     )
+    if ai_insights:
+        logger.info(
+            "advisory_engine: AI enrichment success for rule=%s model=%s",
+            rule.rule_key, ai_insights.get("model")
+        )
+    else:
+        logger.warning("advisory_engine: AI enrichment failed or disabled for rule=%s", rule.rule_key)
 
     return Advisory(
         farmer_id=farmer_id,

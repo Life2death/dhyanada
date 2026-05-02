@@ -358,7 +358,7 @@ async def _ingest_weather_async():
 def ingest_prices(self):
     """
     Daily price ingestion: fetch from 4 sources (Agmarknet, MSIB, NHRDF, Vashi).
-    Runs at 8:00 PM IST (before evening alert trigger at 8:30 PM).
+    Runs at 5:30 AM IST (before daily brief at 7:00 AM, so today's prices are available).
 
     Phase 2 Module 5: Price Alerts
     """
@@ -414,7 +414,7 @@ def trigger_price_alerts(self):
     Check active price alert subscriptions against just-ingested mandi prices.
     Send WhatsApp notifications for triggered alerts.
 
-    Runs at 8:30 PM IST (after ingest_prices completes at 8:00 PM).
+    Runs at 6:00 AM IST (after ingest_prices completes at 5:30 AM).
 
     Phase 2 Module 5: Price Alerts
     """
