@@ -19,14 +19,14 @@ from typing import Iterable, List, Optional
 from sqlalchemy import and_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-logger = logging.getLogger(__name__)
-
 from src.advisory.ai_enrichment import enrich_advisory_with_ai
 from src.advisory.models import WeatherAggregate
 from src.models.advisory import Advisory
 from src.models.advisory_rule import AdvisoryRule
 from src.models.farmer import CropOfInterest, Farmer
 from src.models.weather import WeatherObservation
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
