@@ -687,6 +687,71 @@ async def test_price_ingest():
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/test/cleanup-farmers")
+async def cleanup_farmers():
+    """Delete farmers with no crops (incomplete registrations)."""
+    from sqlalchemy import select, update
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+    from sqlalchemy.orm import sessionmaker
+    from src.models.farmer import Farmer, CropOfInterest
+    from datetime import datetime
+
+    try:
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+        async with AsyncSessionLocal() as session:
+            # Get farmers with crops
+            result = await session.execute(select(CropOfInterest.farmer_id).distinct())
+            farmer_ids_with_crops = {row[0] for row in result.all()}
+
+            # Find and delete incomplete farmers
+            result = await session.execute(
+                select(Farmer).where(Farmer.deleted_at == None)
+            )
+            all_farmers = result.scalars().all()
+
+            incomplete = [f for f in all_farmers if f.id not in farmer_ids_with_crops]
+            deleted_count = 0
+
+            for farmer in incomplete:
+                farmer.deleted_at = datetime.now()
+                deleted_count += 1
+
+            if deleted_count > 0:
+                await session.commit()
+
+            # Show remaining farmers
+            result = await session.execute(
+                select(Farmer).where(Farmer.deleted_at == None)
+            )
+            remaining = result.scalars().all()
+
+            remaining_list = []
+            for f in remaining:
+                result = await session.execute(
+                    select(CropOfInterest.crop).where(CropOfInterest.farmer_id == f.id)
+                )
+                crops = [row[0] for row in result.all()]
+                remaining_list.append({
+                    "id": f.id,
+                    "name": f.name,
+                    "phone": f.phone,
+                    "district": f.district,
+                    "crops": crops
+                })
+
+        await engine.dispose()
+        return {
+            "status": "success",
+            "deleted_incomplete": deleted_count,
+            "remaining_farmers": remaining_list,
+            "message": f"✅ Deleted {deleted_count} incomplete farmers"
+        }
+    except Exception as e:
+        logger.error("Farmer cleanup failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/test/weather-data")
 async def test_weather_data():
     """Show what weather data currently exists in the DB."""
