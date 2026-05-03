@@ -752,6 +752,47 @@ async def cleanup_farmers():
         return {"status": "error", "message": str(e)}
 
 
+@app.get("/test/fix-farmer-district")
+async def fix_farmer_district(farmer_id: int = 1, district: str = "ahmednagar"):
+    """Fix missing district field for a farmer."""
+    try:
+        from sqlalchemy import select, update
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from src.models.farmer import Farmer
+
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with AsyncSessionLocal() as session:
+            await session.execute(
+                update(Farmer)
+                .where(Farmer.id == farmer_id)
+                .values(district=district)
+            )
+            await session.commit()
+
+            result = await session.execute(
+                select(Farmer).where(Farmer.id == farmer_id)
+            )
+            farmer = result.scalar_one()
+
+            return {
+                "status": "success",
+                "farmer": {
+                    "id": farmer.id,
+                    "name": farmer.name,
+                    "district": farmer.district,
+                    "taluka": farmer.taluka,
+                    "subscription_status": farmer.subscription_status
+                },
+                "message": f"✅ Updated farmer {farmer.name} district to {district}"
+            }
+    except Exception as e:
+        logger.error("Fix district failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
 @app.post("/test/register-farmer")
 async def test_register_farmer(
     phone: str = "919167334040",
