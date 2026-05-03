@@ -752,6 +752,91 @@ async def cleanup_farmers():
         return {"status": "error", "message": str(e)}
 
 
+@app.post("/test/register-farmer")
+async def test_register_farmer(
+    phone: str = "919167334040",
+    name: str = "राज कुमार",
+    village: str = "परनेर",
+    crops: str = "कांदा,तूर,सोयाबीन"
+):
+    """Auto-complete farmer registration with all details for testing."""
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+        from sqlalchemy.orm import sessionmaker
+        from src.models.farmer import Farmer, CropOfInterest
+        from src.onboarding.ai_parser import parse_location
+        from datetime import datetime
+
+        engine = create_async_engine(settings.database_url)
+        AsyncSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+        async with AsyncSessionLocal() as session:
+            # Parse location to get district/taluka
+            location_data = await parse_location(village)
+            district = location_data.get("district", "ahmednagar")
+            taluka = location_data.get("taluka", "parner")
+
+            # Create or update farmer
+            result = await session.execute(
+                select(Farmer).where(Farmer.phone == phone)
+            )
+            farmer = result.scalar_one_or_none()
+
+            if not farmer:
+                farmer = Farmer(
+                    phone=phone,
+                    name=name,
+                    first_name=name.split()[0],
+                    last_name=" ".join(name.split()[1:]) if len(name.split()) > 1 else "",
+                    district=district,
+                    taluka=taluka,
+                    subscription_status="active",
+                    onboarding_state="active",
+                    preferred_language="mr",
+                    consent_given_at=datetime.now(),
+                )
+                session.add(farmer)
+                await session.flush()
+            else:
+                farmer.name = name
+                farmer.first_name = name.split()[0]
+                farmer.last_name = " ".join(name.split()[1:]) if len(name.split()) > 1 else ""
+                farmer.district = district
+                farmer.taluka = taluka
+                farmer.subscription_status = "active"
+                farmer.onboarding_state = "active"
+                farmer.consent_given_at = datetime.now()
+
+            # Delete existing crops and add new ones
+            await session.execute(
+                __import__('sqlalchemy', fromlist=['delete']).delete(CropOfInterest).where(CropOfInterest.farmer_id == farmer.id)
+            )
+
+            crop_list = [c.strip() for c in crops.split(",")]
+            for crop in crop_list:
+                if crop:
+                    session.add(CropOfInterest(farmer_id=farmer.id, crop=crop))
+
+            await session.commit()
+
+            return {
+                "status": "success",
+                "farmer": {
+                    "id": farmer.id,
+                    "name": farmer.name,
+                    "phone": farmer.phone,
+                    "district": farmer.district,
+                    "taluka": farmer.taluka,
+                    "crops": crop_list
+                },
+                "message": f"✅ Registered {name} with crops: {', '.join(crop_list)}"
+            }
+    except Exception as e:
+        logger.error("Registration failed: %s", e, exc_info=True)
+        return {"status": "error", "message": str(e)}
+
+
 @app.get("/test/weather-data")
 async def test_weather_data():
     """Show what weather data currently exists in the DB."""
